@@ -22,6 +22,12 @@ const app = initializeApp(firebaseConfig);
 // Realtime Database (NOT Firestore)
 export const db = getDatabase(app);
 
+if (firebaseConfig.databaseURL.includes('ejtune-default-rtdb')) {
+  console.warn('%c⚠️ WARNING: Connected to PRODUCTION Database!', 'background: red; color: white; font-size: 16px; padding: 4px; font-weight: bold;');
+} else {
+  console.log('%c✅ Connected to DEVELOPMENT Database', 'background: green; color: white; padding: 4px;');
+}
+
 // Auth
 export const auth = getAuth(app);
 auth.languageCode = 'ko';
