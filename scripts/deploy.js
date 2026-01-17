@@ -29,32 +29,23 @@ try {
     pkg.version = newVersion;
     fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
 
-    // 4. Build project
-    console.log('Building project...');
-    execSync('npm run build', { stdio: 'inherit' });
-
-    // 5. Deploy to Firebase
-    console.log('Deploying to Firebase Hosting...');
-    execSync('firebase deploy --only hosting', { stdio: 'inherit' });
-
-    // 6. Update Version in Firebase Database
-    console.log('Syncing new version to Firebase Database...');
-    const dbCommand = `firebase database:set /app_settings/version '"${newVersion}"' -f --instance ejtune-default-rtdb`;
-    execSync(dbCommand, { stdio: 'inherit' });
-
-    // 7. Git Tag & Push
-    console.log('Creating Git tag...');
+    // 4. Git Tag & Push
+    console.log('Creating Git tag and pushing to GitHub...');
     execSync(`git add .`, { stdio: 'inherit' });
     execSync(`git commit -m "Chore: Release v${newVersion}"`, { stdio: 'inherit' });
     execSync(`git tag v${newVersion}`, { stdio: 'inherit' });
+
+    // Using simple git push as origin and master are standard
     execSync(`git push origin master --tags`, { stdio: 'inherit' });
 
-    // 8. Create GitHub Release
+    // 5. Create GitHub Release
     console.log('Creating GitHub Release...');
     const releaseCommand = `gh release create v${newVersion} --title "Release v${newVersion}" --notes "Automated release for version ${newVersion}"`;
     execSync(releaseCommand, { stdio: 'inherit' });
 
-    console.log(`\n✅ Successfully deployed and released version ${newVersion}!`);
+    console.log(`\n🚀 version ${newVersion} has been pushed to GitHub!`);
+    console.log(`GitHub Actions will now automatically handle the build and Firebase deployment.`);
+    console.log(`You can track the progress in the 'Actions' tab.`);
 } catch (error) {
     console.error('\n❌ Deployment failed:', error.message);
     process.exit(1);
