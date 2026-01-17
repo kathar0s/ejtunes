@@ -8,7 +8,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "ejtune.firebaseapp.com",
-  databaseURL: "https://ejtune-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://ejtune-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "ejtune",
   storageBucket: "ejtune.firebasestorage.app",
   messagingSenderId: "663588705370",
