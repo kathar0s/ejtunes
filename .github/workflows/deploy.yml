@@ -36,6 +36,6 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "Syncing version $VERSION to Firebase Database..."
           npm install -g firebase-tools
-          firebase database:set /app_settings/version "\"$VERSION\"" --confirm --token "${{ secrets.FIREBASE_TOKEN }}"
+          firebase database:set /app_settings/version "\"$VERSION\"" -f --token "${{ secrets.FIREBASE_TOKEN }}"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
