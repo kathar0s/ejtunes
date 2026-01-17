@@ -35,7 +35,6 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "Syncing version $VERSION to Firebase Database..."
-          npm install -g firebase-tools
-          firebase database:set /app_settings/version "\"$VERSION\"" -f --instance ejtune-default-rtdb --token "${{ secrets.FIREBASE_TOKEN }}"
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_EJTUNE }}' > service-account.json
+          GOOGLE_APPLICATION_CREDENTIALS=service-account.json npx firebase-tools database:set /app_settings/version "\"$VERSION\"" -f --instance ejtune-default-rtdb
+          rm service-account.json
