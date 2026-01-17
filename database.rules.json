@@ -1,0 +1,20 @@
+{
+    "rules": {
+        "rooms": {
+            ".read": true,
+            ".write": true,
+            ".indexOn": [
+                "info/hostOnline",
+                "info/createdAt"
+            ]
+        },
+        "songs": {
+            ".read": true,
+            ".write": true
+        },
+        "votes": {
+            ".read": true,
+            ".write": true
+        }
+    }
+}

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EJTune</title>
+    <link rel="stylesheet" href="./src/style.css">
+    <link rel="icon" type="image/svg+xml" href="/vite.svg">
+    <meta name="theme-color" content="#1DB954">
+    <style>
+        .legacy-flex-center {
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-box-orient: vertical;
+            -webkit-box-direction: normal;
+            -webkit-flex-direction: column;
+            flex-direction: column;
+            -webkit-box-pack: center;
+            -webkit-justify-content: center;
+            justify-content: center;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body class="bg-black text-white min-h-screen">
+
+    <!-- Host Disconnected Modal -->
+    <div id="host-disconnected-modal"
+        class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-fade-in">
+        <div class="bg-gray-900 border border-white/10 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+            <div class="text-6xl mb-6">🔌</div>
+            <h3 class="text-2xl font-bold mb-2 text-white" data-i18n="host_disconnected_title">Connection Lost</h3>
+            <p class="text-gray-400 mb-8 leading-relaxed" data-i18n="host_disconnected_msg">The host has ended the
+                session.</p>
+            <div class="flex flex-col gap-3">
+                <button id="reconnect-btn"
+                    class="w-full py-3 bg-brand-neon text-black rounded-xl font-bold text-lg hover:scale-105 transition shadow-lg shadow-brand-neon/20"
+                    data-i18n="reconnect">Reconnect</button>
+                <button id="return-home-btn"
+                    class="w-full py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-lg hover:bg-white/20 transition"
+                    data-i18n="leave_room">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen (Initial State) -->
+    <div id="loading-screen"
+        class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
+        <div class="w-12 h-12 border-4 border-brand-neon border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen"
+        class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full">
+        <div class="text-6xl mb-6">🎵</div>
+        <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTune</h1>
+        <p class="text-gray-400 mb-8" data-i18n="join_room">Collaborative music for your workspace</p>
+        <button id="login-btn"
+            class="bg-white text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor"
+                    d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
+            </svg>
+            <span data-i18n="sign_in_google">Sign in with Google</span>
+        </button>
+
+        <!-- Language Selector -->
+        <div class="flex items-center gap-4 mt-6">
+            <button class="login-lang-option text-2xl hover:scale-110 transition opacity-50 hover:opacity-100"
+                data-lang="en">🇺🇸</button>
+            <button class="login-lang-option text-2xl hover:scale-110 transition opacity-50 hover:opacity-100"
+                data-lang="ko">🇰🇷</button>
+        </div>
+    </div>
+
+    <!-- Room Select Screen -->
+    <div id="room-select-screen"
+        class="hidden fixed inset-0 z-40 bg-black flex flex-col p-4 sm:p-6 w-full h-full legacy-flex-center">
+        <!-- Layout Wrapper -->
+        <div class="w-full max-w-lg flex flex-col h-full">
+            <header class="flex items-center justify-between mb-6 shrink-0">
+                <h1 class="text-xl font-bold" data-i18n="join_room">Select Room</h1>
+                <div class="flex items-center gap-3 relative">
+                    <!-- Flag Icon (Language) -->
+                    <button id="flag-btn-select" class="text-2xl hover:scale-110 transition">🇺🇸</button>
+
+                    <!-- Avatar Button -->
+                    <button id="avatar-btn-select"
+                        class="w-8 h-8 rounded-full overflow-hidden border border-white/20 hover:border-brand-neon transition relative">
+                        <img id="user-avatar"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            class="w-full h-full object-cover">
+                    </button>
+
+                    <!-- Popovers (Inside relative container) -->
+                    <div id="lang-popover-select"
+                        class="hidden absolute top-12 right-0 w-32 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] overflow-hidden">
+                        <button class="lang-option w-full px-4 py-2 hover:bg-white/10 text-left flex items-center gap-2"
+                            data-lang="en">
+                            <span class="text-xl">🇺🇸</span> English
+                        </button>
+                        <button class="lang-option w-full px-4 py-2 hover:bg-white/10 text-left flex items-center gap-2"
+                            data-lang="ko">
+                            <span class="text-xl">🇰🇷</span> 한국어
+                        </button>
+                    </div>
+
+                    <div id="profile-popover-select"
+                        class="hidden absolute top-12 right-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-right transition-all">
+                        <div class="flex flex-col items-center mb-4">
+                            <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-neon mb-2">
+                                <img id="popover-avatar-select" src="" class="w-full h-full object-cover">
+                            </div>
+                            <p id="popover-name-select" class="font-bold text-lg"></p>
+                            <p id="popover-email-select" class="text-xs text-gray-400"></p>
+                        </div>
+                        <button id="logout-btn-popover-select"
+                            class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                </path>
+                            </svg>
+                            <span data-i18n="logout">Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="mb-6 shrink-0">
+                <div class="flex gap-2">
+                    <input type="text" id="room-code-input" placeholder="Enter room code"
+                        data-i18n="room_code_placeholder"
+                        class="flex-1 min-w-0 bg-brand-gray border border-white/20 focus:border-brand-neon rounded-xl py-3 px-4 text-center uppercase tracking-widest font-mono outline-none transition"
+                        maxlength="6" autocomplete="off">
+                    <button id="join-room-btn"
+                        class="bg-brand-neon text-black px-6 shrink-0 min-w-[80px] rounded-xl font-bold hover:bg-orange-400 transition"
+                        data-i18n="join">
+                        Join
+                    </button>
+                </div>
+            </div>
+
+            <h2 class="text-sm text-gray-400 mb-3 shrink-0" data-i18n="active_rooms">Active Rooms</h2>
+            <div id="room-list" class="flex-1 overflow-y-auto space-y-3 min-h-0">
+                <div class="text-center text-gray-500 py-8" data-i18n="no_active_rooms">Loading rooms...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Screen -->
+    <div id="app-screen" class="hidden h-screen flex flex-col">
+        <header class="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-white/10">
+            <div class="relative px-4">
+                <!-- Main Header Row -->
+                <div class="flex items-center justify-between gap-1">
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <!-- Avatar Button (Moved to Left) -->
+                        <div class="relative z-50">
+                            <button id="avatar-btn-app"
+                                class="w-10 h-10 rounded-full overflow-hidden border-2 border-brand-neon hover:scale-105 transition block shadow-lg shadow-brand-neon/20">
+                                <img id="app-user-avatar"
+                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                    class="w-full h-full object-cover">
+                            </button>
+
+                            <!-- Combined Profile & Language Popover -->
+                            <div id="profile-popover-app"
+                                class="hidden absolute top-14 left-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-left transition-all animate-fade-in-up">
+                                <div class="flex flex-col items-center mb-4">
+                                    <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-neon mb-2">
+                                        <img id="popover-avatar-app" src="" class="w-full h-full object-cover">
+                                    </div>
+                                    <p id="popover-name-app" class="font-bold text-lg"></p>
+                                    <p id="popover-email-app" class="text-xs text-gray-400"></p>
+                                </div>
+
+                                <!-- Language Selection inside Popover -->
+                                <div class="mb-4 border-t border-white/10 pt-4">
+                                    <p class="text-xs text-gray-500 font-bold mb-2 uppercase" data-i18n="language">
+                                        Language</p>
+                                    <div class="relative">
+                                        <select id="lang-select-app"
+                                            class="w-full appearance-none bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-brand-neon transition cursor-pointer">
+                                            <option value="en" class="text-black">🇺🇸 English</option>
+                                            <option value="ko" class="text-black">🇰🇷 한국어</option>
+                                        </select>
+                                        <div
+                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button id="logout-btn-popover-app"
+                                    class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                        </path>
+                                    </svg>
+                                    <span data-i18n="logout">Logout</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="relative min-w-0 flex-1">
+                            <button id="room-info-btn"
+                                class="w-fit max-w-full text-left rounded-lg px-2 -ml-2 py-1 transition group">
+                                <h1 id="current-room-name" class="font-bold truncate text-lg transition">Room</h1>
+                                <p id="current-room-code" class="text-xs text-brand-neon font-mono"></p>
+                            </button>
+
+                            <!-- Room Info Popover -->
+                            <div id="room-info-popover"
+                                class="hidden absolute top-full mt-1 left-0 w-56 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[110] p-3 transform origin-top-left transition-all animate-fade-in-up">
+                                <div class="mb-3 px-1">
+                                    <p class="text-xs text-gray-400 uppercase font-bold mb-1">Created by</p>
+                                    <p id="current-room-creator" class="font-medium text-white truncate">Unknown</p>
+                                </div>
+                                <button id="leave-room-btn"
+                                    class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                        </path>
+                                    </svg>
+                                    <span data-i18n="leave_room">Leave Room</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 shrink-0">
+                        <!-- Search Trigger -->
+                        <button id="header-search-trigger"
+                            class="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-full transition">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </button>
+
+
+                    </div>
+                </div>
+
+                <!-- Search Overlay -->
+                <div id="header-search-overlay"
+                    class="hidden absolute inset-0 bg-brand-dark/95 backdrop-blur z-[60] flex items-center px-4 gap-3 animate-fade-in">
+                    <button id="header-search-back" class="p-2 -ml-2 text-gray-400 hover:text-white transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </button>
+                    <div class="flex-1 relative flex items-center">
+                        <input type="text" id="search-input" placeholder="Paste YouTube URL or search..."
+                            data-i18n="search_placeholder" autocomplete="off"
+                            class="w-full bg-white/10 border border-transparent focus:border-brand-neon rounded-full py-2 pl-4 pr-20 text-sm outline-none transition text-white placeholder-gray-400">
+
+                        <!-- Actions Container -->
+                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <!-- Clear Button (Hidden by default) -->
+                            <button id="remote-clear-search-btn"
+                                class="hidden text-gray-400 hover:text-white rounded-full p-1 mr-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+
+                            <!-- Submit Button -->
+                            <button id="search-submit-btn"
+                                class="text-brand-neon hover:text-white p-1.5 rounded-full hover:bg-white/10 transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="search-results"
+                class="hidden absolute left-0 right-0 top-full bg-brand-gray border-t border-white/10 max-h-[50vh] overflow-y-auto shadow-2xl z-20">
+            </div>
+        </header>
+
+        <main class="p-4 flex-1 flex flex-col space-y-6 overflow-hidden">
+            <section class="bg-gradient-to-br from-brand-gray to-gray-900 rounded-2xl p-4 border border-white/5">
+                <div class="flex gap-4 items-center">
+                    <div
+                        class="w-20 h-20 bg-black rounded-lg shadow-lg overflow-hidden relative flex-shrink-0 flex items-center justify-center">
+                        <img id="np-art"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            class="w-full h-full object-cover hidden">
+                        <div id="np-placeholder" class="text-4xl text-gray-700">🎵</div>
+
+                        <div id="playing-indicator"
+                            class="hidden absolute inset-0 flex items-end justify-end p-1.5 bg-black/40">
+                            <div class="equalizer-bar"><span></span><span></span><span></span></div>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-brand-neon font-bold uppercase tracking-wider mb-1"
+                            data-i18n="now_playing">Now Playing</p>
+                        <h2 id="np-title" class="font-bold text-lg truncate">No music playing</h2>
+                        <p id="np-requester" class="text-gray-400 text-sm truncate" data-i18n="add_song_msg">Add a song
+                            to start</p>
+                    </div>
+                    <button id="like-btn"
+                        class="flex flex-col items-center p-2 rounded-xl hover:bg-white/10 transition">
+                        <span id="like-icon" class="text-2xl">🤍</span>
+                        <span id="like-count" class="text-xs text-gray-400">0</span>
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="remote-progress-section" class="mt-3 px-1">
+                    <div class="group/prog cursor-pointer py-2">
+                        <div id="remote-progress-container"
+                            class="h-1 bg-white/20 rounded-full overflow-hidden relative">
+                            <div id="remote-progress-fill"
+                                class="h-full bg-brand-neon w-0 absolute top-0 left-0 pointer-events-none transition-all duration-100 ease-linear">
+                            </div>
+                            <div id="remote-progress-handle"
+                                class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow pointer-events-none transition-all duration-100 ease-linear -left-1.5 opacity-0 group-hover/prog:opacity-100">
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1 select-none">
+                            <span id="remote-current-time">0:00</span>
+                            <span id="remote-total-time">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div id="admin-controls" class="hidden mt-4 pt-4 border-t border-white/10 relative">
+                    <div id="admin-overlay"
+                        class="absolute inset-0 z-20 bg-black/20 backdrop-blur-[2.5px] flex items-center justify-center rounded-xl hidden cursor-not-allowed">
+                        <span
+                            class="text-xs font-medium text-gray-400 bg-black/80 px-3 py-1.5 rounded-full select-none backdrop-blur-md border border-white/10"
+                            data-i18n="host_control_only">
+                            Host Control Only
+                        </span>
+                    </div>
+                    <!-- Volume & Shuffle -->
+                    <div class="flex items-center gap-3 mb-4">
+
+                        <button id="mute-toggle" class="p-1 text-gray-400 hover:text-white transition" title="Mute">
+                            <svg id="volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                            </svg>
+                            <svg id="mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                            </svg>
+                        </button>
+                        <div class="flex-1 relative h-1 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
+                                style="width: 100%"></div>
+                            <input type="range" id="remote-volume" min="0" max="100" value="100"
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                        </div>
+                    </div>
+                    <!-- Playback Controls -->
+                    <div class="flex items-center justify-center gap-1 xs:gap-4 sm:gap-6">
+                        <button id="shuffle-toggle" class="p-2 text-gray-500 hover:text-white transition"
+                            title="Shuffle">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                            </svg>
+                        </button>
+                        <button id="prev-btn" class="p-3 text-white hover:text-brand-neon transition">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                            </svg>
+                        </button>
+                        <button id="play-pause-btn"
+                            class="p-3 bg-white text-black rounded-full hover:scale-105 transition shadow-lg">
+                            <svg id="remote-play-icon" class="w-6 h-6 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            <svg id="remote-pause-icon" class="w-6 h-6 hidden" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                            </svg>
+                        </button>
+                        <button id="skip-btn" class="p-3 text-white hover:text-brand-neon transition">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                            </svg>
+                        </button>
+                        <button id="repeat-toggle" class="p-2 text-gray-500 hover:text-white transition"
+                            title="Repeat Mode">
+                            <svg id="repeat-icon-all" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6z" />
+                            </svg>
+                            <svg id="repeat-icon-one" class="w-6 h-6 hidden" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="flex-1 flex flex-col min-h-0">
+                <div class="flex items-center justify-between mb-3 px-1 flex-shrink-0">
+                    <h3 class="font-bold text-gray-400" data-i18n="up_next">Up Next</h3>
+                    <span id="remote-queue-count" class="text-sm text-gray-500">0 songs</span>
+                </div>
+                <div id="remote-queue-list" class="space-y-2 overflow-y-auto flex-1 pb-4">
+                    <div class="text-center text-gray-500 py-8 text-sm" data-i18n="no_songs_queue">Queue is empty. Add
+                        some songs!</div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Old Settings Overlay Removed -->
+    </div>
+
+    <!-- Global Popovers (Accessible from any screen) -->
+
+
+    <script type="module" src="/src/remote.js"></script>
+</body>
+
+</html>

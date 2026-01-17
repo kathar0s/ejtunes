@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EJTune - Host</title>
+    <link rel="stylesheet" href="../src/style.css">
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        .legacy-flex-center {
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-box-orient: vertical;
+            -webkit-box-direction: normal;
+            -webkit-flex-direction: column;
+            flex-direction: column;
+            -webkit-box-pack: center;
+            -webkit-justify-content: center;
+            justify-content: center;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen overflow-hidden bg-brand-dark text-white font-sans"
+    style="height: 100%; width: 100%; margin: 0; padding: 0;">
+
+    <!-- Immediate UI State Control -->
+    <script>
+        (function () {
+            const path = window.location.pathname;
+            // Simplistic check: if path ends with /host or /host/ (ignoring query), show setup.
+            // If it has a subpath (e.g. /host/XYZ), keep hidden.
+            // We use a regex or split to be safe.
+            const segments = path.split('/').filter(s => s.length > 0);
+            const isRootHost = segments.length > 0 && segments[segments.length - 1] === 'host';
+
+            // If we are deep linking (/host/CODE), we want Setup hidden (default now).
+            // If we are just at /host, we want Setup shown immediately.
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const setup = document.getElementById('setup-screen');
+                if (isRootHost && setup) {
+                    setup.classList.remove('hidden');
+                    setup.style.removeProperty('display');
+                }
+            });
+        })();
+    </script>
+
+    <!-- Setup Screen (Hidden by default to prevent FOUC on restore) -->
+    <div id="setup-screen" class="hidden legacy-flex-center absolute inset-0 z-50 bg-black p-8 w-full h-full"
+        style="display: none;">
+        <div class="text-6xl mb-6">🎧</div>
+        <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTune</h1>
+        <p class="text-gray-400 mb-8" data-i18n="create_room_desc">Create a room to start hosting</p>
+
+        <div class="w-full max-w-sm space-y-4">
+            <input type="text" id="room-name-input" placeholder="Room name (e.g. 5F Lounge)"
+                data-i18n="room_name_placeholder"
+                class="w-full bg-brand-gray border border-white/20 focus:border-brand-neon rounded-xl py-3 px-4 text-center text-lg outline-none transition">
+
+            <div id="room-name-error" class="hidden text-red-500 text-sm font-bold mt-2"></div>
+
+            <button id="create-room-btn"
+                class="w-full bg-brand-neon text-black py-3 rounded-xl font-bold text-lg hover:bg-orange-400 transition"
+                data-i18n="create_room">
+                Create Room
+            </button>
+        </div>
+
+        <!-- Room Exists Modal -->
+        <div id="room-exists-modal"
+            class="hidden absolute inset-0 z-50 bg-black/90 flex items-center justify-center p-6">
+            <div class="bg-brand-gray border border-white/10 p-6 rounded-2xl max-w-sm w-full text-center">
+                <h3 class="text-xl font-bold mb-4" data-i18n="room_exists_title">Room Already Exists</h3>
+                <p id="room-exists-msg" class="text-gray-400 mb-6">Room is already active. Reuse it?</p>
+                <div class="flex gap-3">
+                    <button id="modal-cancel-btn"
+                        class="flex-1 py-3 border border-white/20 rounded-xl hover:bg-white/10 transition"
+                        data-i18n="change_name">Change Name</button>
+                    <button id="modal-reuse-btn"
+                        class="flex-1 py-3 bg-brand-neon text-black rounded-xl font-bold hover:bg-orange-400 transition"
+                        data-i18n="reuse_room">Reuse Room</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-sm text-gray-500 p-4 rounded-xl w-full max-w-2xl">
+            <p class="font-bold text-gray-400 mb-1" data-i18n="pro_tip">💡 Pro Tip</p>
+            <p data-i18n="pro_tip_desc">Log in with <span class="text-white">YouTube Premium</span> on this browser to
+                play music without ads.</p>
+        </div>
+
+        <button id="lang-toggle-setup" class="mt-8 text-gray-500 hover:text-white text-sm">
+            🌐 <span id="current-lang-setup">English</span>
+        </button>
+    </div>
+
+    <!-- Main Player Screen -->
+    <div id="player-screen" class="hidden h-full flex flex-col relative">
+
+        <!-- Header -->
+        <header
+            class="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-white/5 bg-brand-dark/95 backdrop-blur z-20">
+            <button id="room-info-trigger"
+                class="flex items-center gap-3 hover:bg-white/10 p-2 rounded-xl transition cursor-pointer text-left">
+                <div
+                    class="w-8 h-8 bg-brand-neon rounded-full flex items-center justify-center text-black font-bold relative">
+                    DJ
+                    <span id="host-count-badge"
+                        class="hidden absolute -bottom-1 -right-1 w-4 h-4 bg-white text-black text-[10px] font-bold rounded-full flex items-center justify-center shadow"></span>
+                </div>
+                <div>
+                    <h1 id="room-name" class="font-bold text-lg leading-tight">Room Name</h1>
+                    <p class="text-xs text-brand-neon font-mono tracking-wider" id="room-code">#CODE</p>
+                </div>
+            </button>
+
+            <!-- Search Bar (Centered) -->
+            <div class="flex-1 max-w-xl mx-4 relative hidden sm:block">
+                <input type="text" id="host-search-input-top" placeholder="Paste YouTube URL or search..."
+                    data-i18n="search_placeholder" autocomplete="off"
+                    class="w-full bg-brand-gray border border-white/10 focus:border-brand-neon rounded-full py-2 px-4 pr-10 text-sm outline-none transition">
+                <button id="clear-search-btn-top"
+                    class="hidden absolute right-10 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white mr-1 text-lg leading-none">✕</button>
+                <button id="host-search-submit-top"
+                    class="absolute right-3.5 top-2.5 text-gray-400 text-sm hover:text-white transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </button>
+                <div id="host-search-results-top"
+                    class="absolute top-full left-0 right-0 mt-2 max-h-96 overflow-y-auto bg-brand-gray rounded-xl border border-white/10 hidden shadow-2xl">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button id="host-search-btn" class="p-2 text-gray-400 hover:text-white transition sm:hidden">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </button>
+                <button id="flag-btn-host" class="text-2xl hover:scale-110 transition">🇺🇸</button>
+                <!-- Settings Removed -->
+            </div>
+        </header>
+
+        <!-- Host Language Popover -->
+        <div id="host-lang-popover"
+            class="hidden absolute top-16 right-6 w-48 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+            <button
+                class="host-lang-option w-full px-4 py-3 hover:bg-white/10 text-left flex items-center gap-3 transition border-b border-white/5"
+                data-lang="en">
+                <span class="text-xl">🇺🇸</span> English
+            </button>
+            <button
+                class="host-lang-option w-full px-4 py-3 hover:bg-white/10 text-left flex items-center gap-3 transition"
+                data-lang="ko">
+                <span class="text-xl">🇰🇷</span> 한국어
+            </button>
+        </div>
+
+        <!-- Room Info Popover -->
+        <div id="room-info-popover"
+            class="hidden absolute top-16 left-4 lg:left-6 w-72 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 p-6">
+            <div class="text-center">
+                <!-- Shared Control Toggle -->
+                <div class="flex items-center justify-between mb-4 p-3 bg-white/5 rounded-lg">
+                    <span class="text-sm text-gray-300" data-i18n="shared_control">Allow everyone to control</span>
+                    <button id="shared-control-toggle"
+                        class="relative w-11 h-6 bg-gray-600 rounded-full transition-colors focus:outline-none"
+                        role="switch" aria-checked="false">
+                        <span
+                            class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"></span>
+                    </button>
+                </div>
+
+                <!-- Private Room Toggle -->
+                <div class="flex items-center justify-between mb-4 p-3 bg-white/5 rounded-lg">
+                    <div class="flex-1 text-left">
+                        <span class="text-sm text-gray-300 block" data-i18n="private_room">Private Room</span>
+                        <span class="text-xs text-gray-500 block" data-i18n="private_room_hint">Hidden from public
+                            list</span>
+                    </div>
+                    <button id="private-room-toggle"
+                        class="relative w-11 h-6 bg-gray-600 rounded-full transition-colors focus:outline-none"
+                        role="switch" aria-checked="false">
+                        <span
+                            class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"></span>
+                    </button>
+                </div>
+
+                <!-- Last Controller Info (hidden by default) -->
+                <div id="last-controller-info" class="hidden mb-4 p-3 bg-brand-neon/10 rounded-lg text-left">
+                    <p class="text-xs text-gray-400" data-i18n="last_controller">Last controlled by</p>
+                    <p id="last-controller-name" class="text-sm text-brand-neon font-bold">-</p>
+                </div>
+
+                <button id="delete-room-btn"
+                    class="w-full py-3 text-white-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition text-sm font-bold flex items-center justify-center gap-2"
+                    data-i18n="delete_room">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                        </path>
+                    </svg>
+                    Delete Room
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content: Queue List -->
+        <main class="flex-1 overflow-hidden flex flex-col relative">
+            <div class="flex-1 flex flex-col h-full w-full overflow-hidden">
+                <!-- Fixed Header -->
+                <div class="flex items-center justify-between p-4 lg:p-8 shrink-0">
+                    <h2 class="text-2xl font-bold" data-i18n="up_next">Playlist</h2>
+                    <span id="queue-count" class="text-sm text-gray-400">0 songs</span>
+                </div>
+
+                <!-- Scrollable Queue List (scrollbar on outer edge) -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar">
+                    <div id="queue-list" class="space-y-2 pb-32 px-4 lg:px-8">
+                        <div class="text-center text-gray-500 py-12" data-i18n="no_songs_queue">No songs in queue</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Mobile Search Overlay -->
+        <div id="search-overlay"
+            class="hidden absolute top-0 left-0 right-0 bg-brand-dark/95 backdrop-blur-md z-50 border-b border-white/10 p-4 shadow-2xl sm:hidden">
+            <div class="max-w-3xl mx-auto">
+                <div class="flex items-center gap-2 relative">
+                    <div class="relative flex-1">
+                        <input type="text" id="host-search-input" placeholder="Search..." data-i18n="search_placeholder"
+                            autocomplete="off"
+                            class="w-full bg-brand-gray border border-transparent focus:border-brand-neon rounded-full py-3 px-4 pr-10 text-base outline-none transition">
+
+                        <button id="clear-search-btn"
+                            class="hidden absolute right-10 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-1">✕</button>
+
+                        <button id="host-search-submit"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition p-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="host-search-results"
+                    class="mt-4 max-h-[60vh] overflow-y-auto hidden bg-brand-gray rounded-xl border border-white/10">
+                    <!-- Results -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Overlay -->
+        <!-- Settings Overlay Removed -->
+
+        <!-- Mini Player (Footer) -->
+        <!-- Layout: under xs (480px): 3 rows | xs-sm (480-639px): 2 rows | sm+ (640px+): 1 row -->
+        <footer id="mini-player"
+            class="h-auto min-h-[5rem] md:h-20 bg-brand-gray border-t border-white/10 flex flex-row flex-wrap md:flex-nowrap items-center px-4 py-3 md:py-0 z-40 relative group cursor-pointer transition-all duration-300">
+            <!-- Progress Bar (Top Edge) -->
+            <div class="absolute top-0 left-0 right-0 h-1 bg-white/10 group/progress">
+                <div id="progress-bar-mini" class="h-full bg-brand-neon w-0 transition-all duration-1000 relative">
+                    <!-- Glow effect for progress bar -->
+                    <div
+                        class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-[0_0_10px_rgba(238,122,69,0.8)] opacity-0 group-hover/progress:opacity-100 transition-opacity">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Track Info: Full width (Row 1) on mobile, 1/3 (Col 1) on desktop -->
+            <div class="flex items-center gap-3 w-full md:w-1/3 min-w-0 pr-2 mb-3 md:mb-0 order-1">
+                <!-- Thumbnail -->
+                <div class="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 relative group/thumb">
+                    <img id="mini-art"
+                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                        class="w-full h-full object-cover">
+                    <!-- Expand overlay on thumbnail hover -->
+                    <div
+                        class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                    </div>
+                </div>
+                <!-- Text Info -->
+                <div class="min-w-0 flex-1 flex flex-col justify-center">
+                    <div class="flex items-center">
+                        <h4 id="mini-title" class="font-bold text-sm truncate text-white">Waiting...</h4>
+                        <span
+                            class="text-[0.6rem] px-1.5 py-0.5 rounded bg-white/10 text-brand-neon border border-brand-neon/30 hidden"
+                            id="mini-requester-badge">DJ</span>
+                    </div>
+                    <p id="mini-artist" class="text-xs text-gray-400 truncate">System</p>
+                </div>
+            </div>
+
+            <!-- Play Controls: 60% (Row 2 Left) on mobile, Flex-1 (Col 2) on desktop -->
+            <div class="w-full w-xs-60 md:w-auto md:flex-1 flex justify-center xs:justify-start md:justify-center items-center gap-1 sm:gap-4 order-2 xs:mb-0"
+                onclick="event.stopPropagation()">
+                <!-- Shuffle Button -->
+                <button id="mini-shuffle-btn" class="p-2 text-gray-400 hover:text-white transition">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                    </svg>
+                </button>
+                <button id="mini-prev-btn" class="p-2 text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                    </svg>
+                </button>
+                <button id="mini-play-btn"
+                    class="p-2 bg-white text-black rounded-full hover:scale-105 transition shadow-lg mx-1 sm:mx-2">
+                    <svg id="mini-play-icon" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
+                    <svg id="mini-pause-icon" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    </svg>
+                </button>
+                <button id="mini-next-btn" class="p-2 text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                    </svg>
+                </button>
+                <!-- Repeat Button -->
+                <button id="mini-repeat-btn" class="p-2 text-gray-400 hover:text-white transition">
+                    <svg id="mini-repeat-icon-all" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6z" />
+                    </svg>
+                    <svg id="mini-repeat-icon-one" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Volume & Expand: Full width below sm, Right-aligned on sm+ -->
+            <div class="w-full w-xs-40 md:w-1/3 flex justify-end items-center gap-2 order-3"
+                onclick="event.stopPropagation()">
+                <!-- Volume -->
+                <div class="flex items-center gap-2 flex-1 sm:flex-none">
+                    <button id="host-mute-toggle" class="text-gray-400 hover:text-white transition flex-shrink-0"
+                        title="Mute">
+                        <svg id="host-volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                        </svg>
+                        <svg id="host-mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                        </svg>
+                    </button>
+                    <div class="relative bg-gray-600 rounded-full overflow-hidden flex-1 sm:w-24 sm:flex-none"
+                        style="height: 4px; min-width: 80px;">
+                        <div id="host-volume-fill"
+                            class="absolute left-0 top-0 h-full bg-white rounded-full transition-all duration-100"
+                            style="width: 100%"></div>
+                        <input type="range" id="host-volume" min="0" max="100" value="100"
+                            class="absolute inset-0 w-full h-full cursor-pointer opacity-0">
+                    </div>
+                </div>
+                <!-- Expand Button -->
+                <button id="expand-player-btn"
+                    class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+
+        <!-- Full Screen Player Overlay -->
+        <div id="full-player"
+            class="hidden fixed inset-0 bg-brand-dark/95 backdrop-blur-xl z-50 flex flex-col translate-y-full transition-transform duration-500 ease-out overflow-y-auto"
+            style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; -webkit-transform: translateY(100%); transform: translateY(100%);">
+            <!-- Background Art (Blurred) -->
+            <div class="absolute inset-0 z-0 opacity-30 overflow-hidden pointer-events-none"
+                style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;">
+                <img id="bg-art" src="" class="w-full h-full object-cover blur-3xl scale-150"
+                    style="width: 100%; height: 100%; object-fit: cover; -webkit-filter: blur(64px); filter: blur(64px); -webkit-transform: scale(1.5); transform: scale(1.5);">
+            </div>
+
+            <!-- Fullscreen Toggle (top-left) -->
+            <button id="full-fullscreen-toggle"
+                class="absolute top-4 left-4 lg:top-6 lg:left-6 z-20 p-2 text-gray-400 hover:text-white bg-black/30 rounded-full transition"
+                title="Toggle Fullscreen">
+                <svg id="icon-enter-fullscreen" class="w-6 h-6 lg:w-8 lg:h-8" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 9l4-4m0 0v4m0-4h-4M9 15l-4 4m0 0v-4m0 4h4">
+                    </path>
+                </svg>
+                <svg id="icon-exit-fullscreen" class="hidden w-6 h-6 lg:w-8 lg:h-8" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 5l-4 4m0 0v-4m0 4h4M5 19l4-4m0 0v4m0-4h-4">
+                    </path>
+                </svg>
+            </button>
+
+            <!-- QR Code Toggle (top-right) -->
+            <div id="full-qr-container"
+                class="absolute top-4 right-4 lg:top-6 lg:right-6 z-20 flex flex-col items-end gap-2">
+                <button id="full-qr-toggle"
+                    class="p-2 text-gray-400 hover:text-white bg-black/30 rounded-full transition" title="Show QR Code">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                        </path>
+                    </svg>
+                </button>
+                <!-- QR Card (shown when toggled on) -->
+                <div id="full-qr-code-wrapper" class="hidden bg-white/95 backdrop-blur p-4 rounded-xl shadow-2xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="full-qr-room-code" class="text-gray-800 font-bold text-lg">#----</span>
+                        <button id="full-qr-close" class="p-1 text-gray-500 hover:text-gray-800 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <canvas id="full-qr-code" class="w-28 h-28 lg:w-36 lg:h-36"></canvas>
+                </div>
+            </div>
+
+            <!-- Collapse Button (bottom-right) -->
+            <button id="collapse-player-btn"
+                class="absolute bottom-4 right-4 lg:bottom-6 lg:right-6 z-20 p-2 text-gray-400 hover:text-white bg-black/30 rounded-full transition">
+                <svg class="w-6 h-6 lg:w-8 lg:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+
+
+            <!-- Main Content -->
+            <div
+                class="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-center p-4 lg:p-8 gap-8 lg:gap-12 xl:gap-24 min-h-0">
+
+                <!-- LP Art -->
+                <div
+                    class="w-48 xs:w-72 sm:w-80 lg:w-full lg:max-w-sm xl:max-w-xl 2xl:max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl aspect-square relative group shrink-0">
+                    <div id="lp-art-container"
+                        class="w-full h-full rounded-full border-4 lg:border-8 border-gray-800 shadow-2xl overflow-hidden relative animate-spin-slow paused bg-black">
+                        <img id="full-art"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            class="w-full h-full object-cover opacity-90 scale-150"
+                            style="width: 100%; height: 100%; object-fit: cover;">
+                        <div class="absolute inset-0 flex items-center justify-center"
+                            style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;">
+                            <div class="w-12 h-12 lg:w-16 lg:h-16 bg-brand-dark rounded-full border-2 lg:border-4 border-gray-700"
+                                style="border-radius: 50%;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info & Controls -->
+                <div
+                    class="w-full max-w-md lg:max-w-lg xl:max-w-2xl space-y-6 lg:space-y-8 text-center lg:text-left flex flex-col justify-center">
+                    <div class="space-y-2 w-full">
+                        <div class="w-full overflow-hidden">
+                            <h2 id="full-title"
+                                class="text-2xl sm:text-3xl lg:text-5xl font-bold leading-tight whitespace-nowrap">
+                                Waiting...
+                            </h2>
+                        </div>
+                        <p id="full-artist" class="text-lg sm:text-xl text-gray-400 line-clamp-1">System</p>
+                        <div class="pt-2 flex items-center justify-center lg:justify-start gap-3">
+                            <div class="px-3 py-1 bg-white/10 rounded-full text-xs text-gray-300">
+                                Requested by <span id="full-requester" class="font-bold text-brand-neon">System</span>
+                            </div>
+                            <div class="flex items-center gap-1 text-red-400 font-bold select-none cursor-default">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                </svg>
+                                <span id="full-likes">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full group/prog cursor-pointer py-2">
+                        <div class="h-1 bg-white/20 rounded-full overflow-hidden group-hover/prog:h-2 transition-all">
+                            <div id="full-progress-bar" class="h-full bg-brand-neon w-0"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span id="prog-current">0:00</span>
+                            <span id="prog-duration">--:--</span>
+                        </div>
+                    </div>
+
+                    <!-- Big Controls -->
+                    <div class="flex items-center justify-center lg:justify-between gap-0 sm:gap-8">
+                        <button id="full-shuffle-btn" class="p-3 text-gray-400 hover:text-white transition">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                            </svg>
+                        </button>
+
+                        <button id="full-prev-btn"
+                            class="p-3 sm:p-4 text-white hover:text-brand-neon transition hover:scale-110">
+                            <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                            </svg>
+                        </button>
+                        <button id="full-play-btn"
+                            class="p-5 sm:p-6 bg-brand-neon text-black rounded-full hover:scale-110 transition shadow-lg shadow-brand-neon/30">
+                            <svg id="full-play-icon" class="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24"
+                                fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            <svg id="full-pause-icon" class="w-8 h-8 sm:w-10 sm:h-10 hidden" viewBox="0 0 24 24"
+                                fill="currentColor">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                            </svg>
+                        </button>
+                        <button id="full-next-btn"
+                            class="p-3 sm:p-4 text-white hover:text-brand-neon transition hover:scale-110">
+                            <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                            </svg>
+                        </button>
+
+                        <!-- Empty placeholder for symmetry if needed, or repeat btn later -->
+                        <button id="full-repeat-btn" class="p-3 text-gray-400 hover:text-white transition">
+                            <svg id="full-repeat-icon-all" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6z" />
+                            </svg>
+                            <svg id="full-repeat-icon-one" class="w-6 h-6 hidden" viewBox="0 0 24 24"
+                                fill="currentColor">
+                                <path
+                                    d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Volume -->
+                    <div class="flex items-center gap-4 pb-8 lg:pb-0">
+                        <button id="full-mute-toggle" class="text-gray-400 hover:text-white transition" title="Mute">
+                            <svg id="full-volume-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                            </svg>
+                            <svg id="full-mute-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                            </svg>
+                        </button>
+                        <div class="flex-1 relative h-1 bg-gray-600 rounded-full overflow-hidden">
+                            <div id="full-volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
+                                style="width: 100%"></div>
+                            <input type="range" id="full-volume" min="0" max="100" value="100"
+                                class="absolute inset-0 w-full h-full cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden Youtube Player -->
+        <div id="player" class="absolute pointer-events-none opacity-0 w-1 h-1 top-0 left-0"></div>
+    </div>
+
+    <script type="module" src="../src/host.js"></script>
+</body>
+
+</html>

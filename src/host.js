@@ -1,0 +1,2401 @@
+import { db, auth, provider, generateRoomCode } from './firebase-config';
+import { ref, onValue, set, push, remove, query, orderByChild, equalTo, limitToFirst, get, serverTimestamp, update, onDisconnect, child, increment, runTransaction, off } from "firebase/database";
+// ... imports ...
+
+// ... imports ...
+import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
+import { initLanguage, setLanguage, t, updatePageText } from './i18n';
+import { toast, decodeHtmlEntities, getHighResThumbnail } from './utils';
+import Sortable from 'sortablejs';
+import QRCode from 'qrcode';
+
+// Global State
+let player;
+let isPlayerReady = false;
+let currentVideoId = null;
+let roomId = null;
+let roomName = null;
+let currentUser = null;
+let progressInterval;
+let currentSongData = null; // Store current song for list display
+let currentQueueSnapshot = null; // Store queue snapshot for re-rendering
+let sortableInstance = null;
+let isDragging = false; // Drag lock flag
+let isShuffle = false;
+let repeatMode = 'all'; // 'all' or 'one'
+let mySessionId = null;
+let activeSessions = [];
+let isSharedControl = true; // Default to true until loaded
+let currentSessionRef = null;
+
+function isAmILeader() {
+    if (!mySessionId || activeSessions.length === 0) return false;
+    return activeSessions[0].key === mySessionId;
+}
+
+function updateLeaderUI() {
+    const iconContainer = document.querySelector('#room-info-trigger div');
+    if (!iconContainer) return;
+
+    // Find text node to replace "DJ" with "👑"
+    let textNode = null;
+    iconContainer.childNodes.forEach(node => {
+        if (node.nodeType === 3 && node.textContent.trim().length > 0) {
+            textNode = node;
+        }
+    });
+
+    const deleteBtn = document.getElementById('delete-room-btn');
+    if (isAmILeader()) {
+        if (textNode) textNode.textContent = '👑';
+        iconContainer.classList.remove('bg-brand-neon', 'text-black', 'border-white');
+        // Gold border with dark background for high contrast with the emoji
+        iconContainer.classList.add('bg-gray-900', 'text-white', 'border-2', 'border-yellow-400', 'shadow-lg', 'shadow-yellow-400/20');
+        iconContainer.style.fontSize = '1.25rem'; // Slightly larger emoji
+
+        // Update Delete Button for Leader
+        if (deleteBtn) {
+            deleteBtn.textContent = '방 삭제'; // Delete Room
+            deleteBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+            deleteBtn.classList.add('bg-red-600/90', 'hover:bg-red-700');
+        }
+    } else {
+        if (textNode) textNode.textContent = 'DJ';
+        iconContainer.classList.add('bg-brand-neon', 'text-black');
+        iconContainer.classList.remove('bg-gray-900', 'text-white', 'border-2', 'border-yellow-400', 'shadow-lg', 'shadow-yellow-400/20');
+        if (iconContainer.classList.contains('border-white')) iconContainer.classList.remove('border-2');
+        iconContainer.style.removeProperty('font-size');
+
+        // Update Leave Button for Follower
+        // Update Leave Button for Follower
+        if (deleteBtn) {
+            deleteBtn.textContent = '방 나가기'; // Leave Room
+            // Style: Bordered, cleaner look
+            deleteBtn.classList.remove('bg-red-600/90', 'hover:bg-red-700', 'text-white');
+            deleteBtn.classList.add('bg-transparent', 'border', 'border-gray-500', 'text-gray-300', 'hover:bg-white/10', 'hover:text-white', 'hover:border-gray-400');
+        }
+    }
+    updateControlState();
+
+    // Restrict Settings for Followers (Only Leader can change Shared Control / Private Room)
+    const settingsToggles = [
+        document.getElementById('shared-control-toggle'),
+        document.getElementById('private-room-toggle')
+    ];
+
+    settingsToggles.forEach(toggle => {
+        if (!toggle) return;
+        if (isAmILeader()) {
+            toggle.style.opacity = '1';
+            toggle.style.pointerEvents = 'auto';
+            toggle.style.cursor = 'pointer';
+        } else {
+            toggle.style.opacity = '0.5';
+            toggle.style.pointerEvents = 'none';
+            toggle.style.cursor = 'not-allowed';
+        }
+    });
+}
+
+function updateControlState() {
+    const amLeader = isAmILeader();
+    const canControl = amLeader || isSharedControl;
+
+    // Elements to disable/dim (buttons only, not inputs)
+    const buttons = [
+        miniPlayBtn, miniNextBtn, miniPrevBtn,
+        miniShuffleBtn, miniRepeatBtn,
+        fullPlayBtn, fullNextBtn, fullPrevBtn,
+        fullShuffleBtn, fullRepeatBtn,
+        // Mute buttons only (not volume sliders)
+        document.getElementById('host-mute-toggle'),
+        document.getElementById('full-mute-toggle'),
+        // Seek Bars (Containers)
+        progressBarMini ? progressBarMini.parentElement : null,
+        fullProgressBar ? fullProgressBar.parentElement.parentElement : null
+    ];
+
+    buttons.forEach(btn => {
+        if (!btn) return;
+        if (canControl) {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+            btn.style.cursor = 'pointer';
+        } else {
+            btn.style.opacity = '0.3';
+            btn.style.pointerEvents = 'none';
+            btn.style.cursor = 'not-allowed';
+        }
+    });
+
+    // Volume sliders: control via container wrapper (not the input itself to preserve opacity:0)
+    const volumeContainers = [
+        hostVolume ? hostVolume.parentElement : null,
+        fullVolume ? fullVolume.parentElement : null
+    ];
+    volumeContainers.forEach(container => {
+        if (!container) return;
+        if (canControl) {
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto';
+        } else {
+            container.style.opacity = '0.3';
+            container.style.pointerEvents = 'none';
+        }
+    });
+
+    // Disable Sortable (Drag & Drop)
+    if (sortableInstance) {
+        sortableInstance.option('disabled', !canControl);
+        const handles = document.querySelectorAll('.drag-handle');
+        handles.forEach(h => {
+            h.style.display = canControl ? 'block' : 'none';
+            h.style.cursor = canControl ? 'grab' : 'default';
+        });
+    }
+}
+
+const YOUTUBE_API_KEY = 'AIzaSyBuN6OIAjU8C2q37vIhIZkY_l8hg3R_z9g';
+const INVIDIOUS_INSTANCES = [
+    'https://inv.nadeko.net',
+    'https://invidious.snopyta.org',
+    'https://yewtu.be'
+];
+
+// Elements
+const setupScreen = document.getElementById('setup-screen');
+const playerScreen = document.getElementById('player-screen');
+const fullPlayer = document.getElementById('full-player');
+const roomNameInput = document.getElementById('room-name-input');
+const roomNameError = document.getElementById('room-name-error');
+const createRoomBtn = document.getElementById('create-room-btn');
+const roomExistsModal = document.getElementById('room-exists-modal');
+const roomExistsMsg = document.getElementById('room-exists-msg');
+const modalCancelBtn = document.getElementById('modal-cancel-btn');
+const modalReuseBtn = document.getElementById('modal-reuse-btn');
+
+const roomNameEl = document.getElementById('room-name');
+
+// Mini Player Elements
+const miniArt = document.getElementById('mini-art');
+const miniTitle = document.getElementById('mini-title');
+const miniArtist = document.getElementById('mini-artist');
+const miniPlayBtn = document.getElementById('mini-play-btn');
+const miniPlayIcon = document.getElementById('mini-play-icon');
+const miniPauseIcon = document.getElementById('mini-pause-icon');
+const miniNextBtn = document.getElementById('mini-next-btn');
+const miniPrevBtn = document.getElementById('mini-prev-btn');
+const miniShuffleBtn = document.getElementById('mini-shuffle-btn');
+const miniRepeatBtn = document.getElementById('mini-repeat-btn');
+const miniRepeatIconAll = document.getElementById('mini-repeat-icon-all');
+const miniRepeatIconOne = document.getElementById('mini-repeat-icon-one');
+const expandPlayerBtn = document.getElementById('expand-player-btn');
+const hostVolume = document.getElementById('host-volume');
+const progressBarMini = document.getElementById('progress-bar-mini');
+
+// Full Player Elements
+const bgArt = document.getElementById('bg-art');
+const fullArt = document.getElementById('full-art');
+const lpContainer = document.getElementById('lp-art-container');
+const fullTitle = document.getElementById('full-title');
+const fullArtist = document.getElementById('full-artist');
+const fullRequester = document.getElementById('full-requester');
+const fullLikes = document.getElementById('full-likes');
+const fullLikeBtn = document.getElementById('full-like-btn');
+const fullPlayBtn = document.getElementById('full-play-btn');
+const fullPlayIcon = document.getElementById('full-play-icon');
+const fullPauseIcon = document.getElementById('full-pause-icon');
+const fullNextBtn = document.getElementById('full-next-btn');
+const fullPrevBtn = document.getElementById('full-prev-btn');
+const fullShuffleBtn = document.getElementById('full-shuffle-btn');
+const fullRepeatBtn = document.getElementById('full-repeat-btn');
+const fullRepeatIconAll = document.getElementById('full-repeat-icon-all');
+const fullRepeatIconOne = document.getElementById('full-repeat-icon-one');
+const fullVolume = document.getElementById('full-volume');
+const collapsePlayerBtn = document.getElementById('collapse-player-btn');
+const fullProgressBar = document.getElementById('full-progress-bar');
+const progCurrent = document.getElementById('prog-current');
+const progDuration = document.getElementById('prog-duration');
+
+// Search & Settings
+const searchOverlay = document.getElementById('search-overlay');
+const settingsOverlay = document.getElementById('settings-overlay');
+const hostSearchBtn = document.getElementById('host-search-btn');
+const hostSearchInput = document.getElementById('host-search-input');
+const hostSearchInputTop = document.getElementById('host-search-input-top');
+const hostSearchSubmitTop = document.getElementById('host-search-submit-top');
+const hostSearchSubmit = document.getElementById('host-search-submit');
+const hostSearchResults = document.getElementById('host-search-results');
+const hostSearchResultsTop = document.getElementById('host-search-results-top');
+const flagBtnHost = document.getElementById('flag-btn-host');
+const hostLangPopover = document.getElementById('host-lang-popover');
+const hostLangOptions = document.querySelectorAll('.host-lang-option');
+const clearSearchBtn = document.getElementById('clear-search-btn');
+const clearSearchBtnTop = document.getElementById('clear-search-btn-top');
+const langToggleSetup = document.getElementById('lang-toggle-setup');
+const roomInfoTrigger = document.getElementById('room-info-trigger');
+const roomInfoPopover = document.getElementById('room-info-popover');
+
+const sharedControlToggle = document.getElementById('shared-control-toggle');
+const privateRoomToggle = document.getElementById('private-room-toggle');
+const lastControllerInfo = document.getElementById('last-controller-info');
+const lastControllerName = document.getElementById('last-controller-name');
+
+// Immediate UI State Check to prevent FOUC (Flash of Unstyled Content / Setup Screen)
+(function () {
+    const pathSegments = window.location.pathname.split('/');
+    const hostIndex = pathSegments.indexOf('host');
+    if (hostIndex !== -1 && pathSegments.length > hostIndex + 1) {
+        const potentialId = pathSegments[hostIndex + 1];
+        if (potentialId && potentialId.length >= 4) {
+            // If URL looks like a room URL, hide setup screen immediately
+            const setup = document.getElementById('setup-screen');
+            if (setup) {
+                setup.classList.add('hidden');
+                setup.style.display = 'none';
+            }
+        }
+    }
+})();
+
+// Close search overlay when clicking outside
+document.addEventListener('click', (e) => {
+    if (!searchOverlay || searchOverlay.classList.contains('hidden')) return;
+
+    // Do not close if clicking inside search overlay or on the toggle button
+    if (searchOverlay.contains(e.target) || hostSearchBtn.contains(e.target)) return;
+
+    searchOverlay.classList.add('hidden');
+});
+
+// Init Language
+const updateLangDisplay = () => {
+    const isKo = document.documentElement.lang === 'ko';
+    langToggleSetup.innerHTML = isKo ? '<span class="text-xl">🇰🇷</span> 한국어' : '<span class="text-xl">🇺🇸</span> English';
+    if (flagBtnHost) {
+        flagBtnHost.textContent = isKo ? '🇰🇷' : '🇺🇸';
+    }
+};
+
+initLanguage();
+updatePageText();
+updateLangDisplay();
+
+// Auth
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        currentUser = user;
+
+        // Check for Room ID in URL path: /host/ROOM_ID
+        const pathSegments = window.location.pathname.split('/');
+        const hostIndex = pathSegments.indexOf('host');
+
+        // Ensure there is a segment after 'host'
+        if (hostIndex !== -1 && pathSegments.length > hostIndex + 1) {
+            const potentialId = pathSegments[hostIndex + 1];
+
+            // Basic validation (e.g., alphanumeric, length check usually 6)
+            if (potentialId && potentialId.length >= 4) {
+                const urlRoomId = potentialId.toUpperCase();
+
+                // Try to restore session
+                const snapshot = await get(ref(db, `rooms/${urlRoomId}/info`));
+                if (snapshot.exists()) {
+                    const info = snapshot.val();
+                    roomName = info.name;
+                    roomId = urlRoomId;
+                    console.log(`Restoring room from URL: ${roomId}`);
+                    setupRoom(roomId, true); // Treat as reuse/restore
+                } else {
+                    console.warn(`Room ID from URL not found: ${urlRoomId}`);
+                    // Restoration failed: Show setup screen
+                    const setup = document.getElementById('setup-screen');
+                    if (setup) {
+                        setup.classList.add('legacy-flex-center');
+                        setup.classList.remove('hidden');
+                        setup.style.removeProperty('display');
+                    }
+                    window.history.pushState({}, '', '/host');
+                }
+            } else {
+                // Invalid ID: Show setup screen
+                const setup = document.getElementById('setup-screen');
+                if (setup) {
+                    setup.classList.add('legacy-flex-center');
+                    setup.classList.remove('hidden');
+                    setup.style.removeProperty('display');
+                }
+            }
+        }
+    } else {
+        // Not logged in: Show setup screen
+        const setup = document.getElementById('setup-screen');
+        if (setup) {
+            setup.classList.add('legacy-flex-center');
+            setup.classList.remove('hidden');
+            setup.style.removeProperty('display');
+        }
+    }
+});
+
+// Setup Events
+langToggleSetup.addEventListener('click', () => {
+    const newLang = document.documentElement.lang === 'ko' ? 'en' : 'ko';
+    setLanguage(newLang);
+    updateLangDisplay();
+});
+
+createRoomBtn.addEventListener('click', async () => {
+    const roomNameError = document.getElementById('room-name-error');
+    const showError = (msg) => {
+        roomNameError.textContent = msg;
+        roomNameError.classList.remove('hidden');
+    };
+    const hideError = () => {
+        roomNameError.classList.add('hidden');
+    };
+
+    if (!currentUser) {
+        try {
+            const result = await signInWithPopup(auth, provider);
+            currentUser = result.user;
+        } catch (e) {
+            showError(t('login_required'));
+            return;
+        }
+    }
+
+    let name = roomNameInput.value.trim();
+    if (!name) {
+        showError(t('room_name_required') || 'Please enter a room name');
+        return;
+    }
+
+    hideError();
+
+    // Check duplicates or ID lookup
+    let existingId = null;
+
+    if (name.startsWith('#')) {
+        // ID Lookup
+        const targetId = name.substring(1);
+        const snapshot = await get(ref(db, `rooms/${targetId}`));
+        if (snapshot.exists() && snapshot.val().info) {
+            existingId = targetId;
+            name = snapshot.val().info.name; // Use actual room name for display
+        } else {
+            showError('Room not found (방을 찾을 수 없습니다)');
+            return;
+        }
+    } else {
+        // Name Lookup
+        const roomsRef = ref(db, 'rooms');
+        const snapshot = await get(roomsRef);
+
+        if (snapshot.exists()) {
+            snapshot.forEach((child) => {
+                const info = child.val().info;
+                if (info && info.name === name) {
+                    existingId = child.key;
+                }
+            });
+        }
+    }
+
+    if (existingId) {
+        // Show Custom Modal
+        roomExistsMsg.textContent = t('room_exists_msg', { name: name });
+        roomExistsModal.classList.remove('hidden');
+
+        // Handle Reuse
+        const reuseHandler = () => {
+            roomName = name;
+            roomId = existingId;
+            setupRoom(roomId, true); // true = reuse
+            roomExistsModal.classList.add('hidden');
+            cleanup();
+        };
+
+        // Handle Cancel (Change Name)
+        const cancelHandler = () => {
+            roomExistsModal.classList.add('hidden');
+            roomNameError.textContent = t('name_taken_error');
+            roomNameError.classList.remove('hidden');
+            roomNameInput.classList.add('border-red-500', 'focus:border-red-500');
+            roomNameInput.focus();
+            cleanup();
+        };
+
+        const cleanup = () => {
+            modalReuseBtn.removeEventListener('click', reuseHandler);
+            modalCancelBtn.removeEventListener('click', cancelHandler);
+        };
+
+        modalReuseBtn.addEventListener('click', reuseHandler);
+        modalCancelBtn.addEventListener('click', cancelHandler);
+
+    } else {
+        // Create New
+        roomName = name;
+        roomId = generateRoomCode();
+        setupRoom(roomId, false); // false = new
+    }
+});
+
+// Helper to init room (refactored from original listener)
+async function setupRoom(id, isReuse) {
+    // Update URL to persist Room ID
+    const currentPath = window.location.pathname;
+    // Avoid duplicate history entries if already on correct path
+    if (!currentPath.includes(id)) {
+        window.history.pushState({}, '', `/host/${id}`);
+    }
+
+    let roomUpdates = {};
+
+    if (isReuse) {
+        // Only update hostOnline, preserve other settings like sharedControl
+        roomUpdates[`rooms/${id}/info/hostOnline`] = true;
+        roomUpdates[`rooms/${id}/info/name`] = roomName;
+        // Reuse shouldn't change isPrivate unless we explicitly want to, preserving existing
+    } else {
+        // New Room - Initialize
+        roomUpdates[`rooms/${id}/info`] = {
+            name: roomName,
+            createdAt: serverTimestamp(),
+            hostOnline: true,
+            sharedControl: false,
+            isPrivate: false,
+            createdBy: currentUser.uid,
+            creatorName: currentUser.displayName
+        };
+        roomUpdates[`rooms/${id}/current_playback`] = {
+            status: 'idle',
+            title: t('waiting_requests'),
+            artist: t('add_song_msg'),
+            volume: 50,
+            shuffle: false
+        };
+        roomUpdates[`rooms/${id}/queue`] = {};
+    }
+
+    roomUpdates[`rooms/${id}/commands`] = null;
+
+    if (Object.keys(roomUpdates).length > 0) {
+        await update(ref(db), roomUpdates);
+    }
+
+    // Register Multi-Tab Host Session with Reconnection Support
+    // This handles iOS/iPad background suspension where WebSocket disconnects
+    const sessionsRef = ref(db, `rooms/${id}/host_sessions`);
+
+    const registerSession = async () => {
+        // Create new session reference on each connection
+        currentSessionRef = push(sessionsRef);
+        mySessionId = currentSessionRef.key; // Store my session ID
+        const sessionData = {
+            connectedAt: serverTimestamp(),
+            userAgent: navigator.userAgent
+        };
+        await set(currentSessionRef, sessionData);
+        onDisconnect(currentSessionRef).remove();
+        console.log('[Host Session] Registered:', mySessionId);
+    };
+
+    // Monitor connection state and re-register session on reconnect
+    const connectedRef = ref(db, '.info/connected');
+    onValue(connectedRef, async (snapshot) => {
+        if (snapshot.val() === true) {
+            // Connected (or reconnected)
+            await registerSession();
+        } else {
+            // Disconnected - session will be cleaned up by onDisconnect handler
+            console.log('[Host Session] Disconnected, waiting for reconnect...');
+        }
+    });
+
+    // Ensure hostOnline is true (but don't set false on disconnect here, rely on session check)
+    // We update it above in roomUpdates, so it's fine.
+    // Important: REMOVE the old onDisconnect that kills the room when one tab closes.
+    // const hostOnlineRef = ref(db, `rooms/${id}/info/hostOnline`);
+    // onDisconnect(hostOnlineRef).set(false);
+
+    setupScreen.classList.remove('legacy-flex-center');
+    setupScreen.classList.add('hidden');
+    setupScreen.style.display = 'none';
+    playerScreen.classList.remove('hidden');
+    playerScreen.style.display = 'flex';
+
+    document.getElementById('room-name').textContent = roomName;
+    document.getElementById('room-code').textContent = `#${id}`;
+
+    // Listen for host count changes
+    // Listen for host count changes and Leader Election
+    const hostCountBadge = document.getElementById('host-count-badge');
+    onValue(sessionsRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const sessions = snapshot.val();
+            // Convert to array and sort by connectedAt
+            activeSessions = Object.keys(sessions).map(key => ({
+                key,
+                ...sessions[key]
+            })).sort((a, b) => (a.connectedAt || 0) - (b.connectedAt || 0));
+
+            const count = activeSessions.length;
+            if (count >= 2) {
+                hostCountBadge.textContent = count;
+                hostCountBadge.classList.remove('hidden');
+            } else {
+                hostCountBadge.classList.add('hidden');
+            }
+        } else {
+            activeSessions = [];
+            hostCountBadge.classList.add('hidden');
+        }
+        updateLeaderUI();
+    });
+
+    initYouTubePlayer();
+    initRoomSettings();
+    updateLangDisplay(); // Ensure flag icon is synced
+}
+
+// Clear error on input
+roomNameInput.addEventListener('input', () => {
+    roomNameError.classList.add('hidden');
+    roomNameInput.classList.remove('border-red-500', 'focus:border-red-500');
+});
+
+
+
+// Player Setup
+function initYouTubePlayer() {
+    if (window.YT && window.YT.Player) {
+        createPlayer();
+    } else {
+        window.onYouTubeIframeAPIReady = createPlayer;
+    }
+}
+
+function createPlayer() {
+    player = new YT.Player('player', {
+        height: '1',
+        width: '1',
+        playerVars: {
+            'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1
+        },
+        events: {
+            'onReady': onPlayerReady,
+            'onStateChange': onPlayerStateChange,
+            'onError': onPlayerError
+        }
+    });
+}
+
+function onPlayerReady() {
+    isPlayerReady = true;
+    initListeners();
+    startProgressLoop();
+}
+
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.ENDED) {
+        if (!isAmILeader()) {
+            console.log("Not leader, ignoring auto-next.");
+            return;
+        }
+        resetProgressBar();
+        // Race Condition Safeguard: Only skip if we are playing the current song in DB
+        get(ref(db, `rooms/${roomId}/current_playback`)).then(snapshot => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                if (data.queueKey === currentSongData.queueKey) {
+                    if (repeatMode === 'one' && currentSongData.queueKey) {
+                        playSongByKey(currentSongData.queueKey);
+                    } else {
+                        playNextSong();
+                    }
+                } else {
+                    console.log("Skipping next song trigger: DB song does not match local.");
+                }
+            } else {
+                playNextSong();
+            }
+        });
+    }
+    if (event.data === YT.PlayerState.PLAYING) {
+        setVisuals(true);
+
+        // Prevent animation from 0% on initial load/seek
+        if (player && typeof player.getCurrentTime === 'function' && typeof player.getDuration === 'function') {
+            const cur = player.getCurrentTime();
+            const dur = player.getDuration();
+            if (dur > 0) {
+                const pct = (cur / dur) * 100;
+                progressBarMini.style.transition = 'none';
+                fullProgressBar.style.transition = 'none';
+                progressBarMini.style.width = `${pct}%`;
+                fullProgressBar.style.width = `${pct}%`;
+
+                // Force reflow
+                void progressBarMini.offsetWidth;
+
+                // Restore transition shortly after
+                setTimeout(() => {
+                    progressBarMini.style.removeProperty('transition');
+                    fullProgressBar.style.removeProperty('transition');
+                }, 500);
+            }
+        }
+
+        startProgressLoop(); // Start loop *after* setting initial state
+
+        // Sync: Calculate startedAt based on current time (Resume handling)
+        const currentTime = player.getCurrentTime();
+        const now = serverTimestamp();
+        // We can't use serverTimestamp locally for calculation, so we push to DB.
+        // But to calc startedAt locally we need an estimate. 
+        // Better: Just push update. 
+        // Note: serverTimestamp() is a placeholder, can't subtract from it in JS.
+        // We rely on the fact that when we resume, we want 'startedAt' to be 'Now - elapsed'.
+        // Since we can't do math on serverTimestamp() in JS easily before pushing,
+        // we will use offset locally if needed, but for DB we might need a cloud function or just trust local time?
+        // Actually, for sync, using Date.now() + serverOffset is best, but here simplicity:
+        // Let's just update status. The 'startedAt' is critical for NEW starts. 
+        // For Resumes, we need to update startedAt effectively.
+        // We will assume Resume happens fast.
+
+        // However, standard technique: startedAt = Now - elapsed.
+        // We will update DB with estimated startedAt based on client clock (approx is fine)
+        // OR better: Update status='playing' AND elapsed=currentTime.
+        // Then listeners calc: if playing, seekTo = elapsed + (Now - updatedAt).
+        // This requires 'updatedAt'.
+
+        // Let's stick to the user approved plan: "Calculate new startedAt = Now - CurrentElapsed"
+        // Since we use Firebase serverTimestamp() for 'Now', we have a problem doing math.
+        // Workaround: Read offset. OR just use Client Time for startedAt approx?
+        // No, client clocks differ.
+
+        // Alternative: Update 'status' and 'elapsed'.
+        // Listeners: if status==playing, current = elapsed + (serverTime - updatedAt).
+        // This is safer. But requires 'updatedAt'.
+
+        // WAIT. User approved plan: "startedAt = Now - CurrentElapsed".
+        // Real implementation: We can't subtract from serverTimestamp placeholder.
+        // We have to use: startedAt = ServerValue.TIMESTAMP. But we want (Now - Elapsed).
+        // We can't send "ServerValue.TIMESTAMP - 5000".
+
+        // So we MUST use a slightly different approach for Resume:
+        // Update `startedAt` using `Date.now() - elapsed * 1000` (Client time).
+        // This relies on host clock correctness.
+        // Most hosts are close enough.
+        // Let's try this:
+        update(ref(db, `rooms/${roomId}/current_playback`), {
+            status: 'playing',
+            startedAt: Date.now() - (currentTime * 1000)
+        });
+
+        // Ensure high-res art is used if available (refresh on play)
+        if (currentVideoId) {
+            const hiRes = getHighResThumbnail(currentVideoId);
+            if (fullArt.src !== hiRes) {
+                fullArt.src = hiRes;
+                bgArt.src = hiRes;
+            }
+        }
+    }
+    if (event.data === YT.PlayerState.PAUSED) {
+        setVisuals(false);
+        update(ref(db, `rooms/${roomId}/current_playback`), {
+            status: 'paused',
+            elapsed: player.getCurrentTime()
+        });
+    }
+}
+
+function onPlayerError() { playNextSong(); }
+
+function resetProgressBar() {
+    progressBarMini.style.transition = 'none';
+    fullProgressBar.style.transition = 'none';
+    progressBarMini.style.width = '0%';
+    fullProgressBar.style.width = '0%';
+    progCurrent.textContent = '0:00';
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            progressBarMini.style.transition = '';
+            fullProgressBar.style.transition = '';
+        }, 100);
+    });
+}
+
+function startProgressLoop() {
+    if (progressInterval) clearInterval(progressInterval);
+    progressInterval = setInterval(() => {
+        if (!player || !isPlayerReady || typeof player.getPlayerState !== 'function') return;
+        if (player.getPlayerState() !== YT.PlayerState.PLAYING) return;
+
+        if (typeof player.getCurrentTime !== 'function' || typeof player.getDuration !== 'function') return;
+        const current = player.getCurrentTime();
+        const duration = player.getDuration();
+
+        if (duration > 0) {
+            const percent = (current / duration) * 100;
+            progressBarMini.style.width = `${percent}%`;
+            fullProgressBar.style.width = `${percent}%`;
+
+            progCurrent.textContent = formatTime(current);
+            progDuration.textContent = formatTime(duration);
+        }
+    }, 1000);
+}
+
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Seek Handling with Scrubbing Support
+let isScrubbing = false;
+
+const onSeekStart = (e) => {
+    isScrubbing = true;
+    handleScrubVisuals(e);
+};
+
+const onSeekMove = (e) => {
+    if (!isScrubbing) return;
+    handleScrubVisuals(e);
+};
+
+const onSeekEnd = (e) => {
+    if (!isScrubbing && e.type !== 'click') return; // Click handles itself if not scrubbing
+    isScrubbing = false;
+
+    // Calculate final time and seek
+    const percent = getSeekPercent(e);
+    if (player && isPlayerReady && player.getDuration) {
+        const duration = player.getDuration();
+        if (duration > 0) {
+            // Clamp to avoid instant ending if user seeks to 100%
+            let seekTime = duration * percent;
+            if (seekTime >= duration - 1) seekTime = duration - 1;
+
+            player.seekTo(seekTime);
+
+            // Disable transition for instant update
+            progressBarMini.style.setProperty('transition', 'none', 'important');
+            fullProgressBar.style.setProperty('transition', 'none', 'important');
+
+            // Update progress bar immediately
+            const finalPercent = (seekTime / duration) * 100;
+            progressBarMini.style.width = `${finalPercent}%`;
+            fullProgressBar.style.width = `${finalPercent}%`;
+            progCurrent.textContent = formatTime(seekTime);
+
+            // Restore transition after a short delay
+            setTimeout(() => {
+                progressBarMini.style.removeProperty('transition');
+                fullProgressBar.style.removeProperty('transition');
+            }, 100);
+
+            // Explicitly update StartedAt to prevent sync drift jump-back
+            update(ref(db, `rooms/${roomId}/current_playback`), {
+                status: 'playing',
+                startedAt: Date.now() - (seekTime * 1000),
+                elapsed: seekTime // Save for referencing
+            });
+        }
+    }
+};
+
+// Helper for calculating percentage
+const getSeekPercent = (e) => {
+    let clientX;
+    if (e.touches && e.touches.length > 0) clientX = e.touches[0].clientX;
+    else if (e.changedTouches && e.changedTouches.length > 0) clientX = e.changedTouches[0].clientX;
+    else clientX = e.clientX;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const width = rect.width;
+    return Math.max(0, Math.min(0.99, x / width)); // Cap at 99%
+};
+
+const handleScrubVisuals = (e) => {
+    const percent = getSeekPercent(e);
+    progressBarMini.style.setProperty('transition', 'none', 'important');
+    fullProgressBar.style.setProperty('transition', 'none', 'important');
+    progressBarMini.style.width = `${percent * 100}%`;
+    fullProgressBar.style.width = `${percent * 100}%`;
+
+    if (player && player.getDuration) {
+        const duration = player.getDuration();
+        progCurrent.textContent = formatTime(duration * percent);
+    }
+};
+
+
+// Bind Events
+const bindSeekEvents = (element) => {
+    element.addEventListener('click', onSeekEnd);
+    element.addEventListener('touchstart', onSeekStart, { passive: true });
+    element.addEventListener('touchmove', onSeekMove, { passive: true });
+    element.addEventListener('touchend', onSeekEnd, { passive: true });
+};
+
+// Apply to Progress Bars
+bindSeekEvents(fullProgressBar.parentElement.parentElement);
+bindSeekEvents(progressBarMini.parentElement);
+
+// Core Logic (Playlist Mode)
+async function playSong(song) {
+    if (!song) return;
+
+    // Safety Guard: Only Leader should execute this directly
+    if (!isAmILeader()) {
+        if (!isSharedControl) {
+            toast.show(t('host_control_only'));
+        } else {
+            // If Shared Control is ON but this function called directly (e.g. from internal logic not caught by higher level delegates),
+            // We should ideally delegate. But playSong takes an object. 
+            // If we are here, it means we probably should have used playSongByKey.
+            // For safety, we block direct DB writes from followers for playback changes to prevent desync.
+            console.warn("Follower attempted direct playSong. Use playSongByKey for delegation.");
+        }
+        return;
+    }
+
+    resetProgressBar();
+    const updates = {};
+    updates[`rooms/${roomId}/current_playback`] = {
+        videoId: song.videoId,
+        title: song.title,
+        artist: song.artist || '',
+        thumbnail: song.thumbnail,
+        requester: song.requester,
+        requesterId: song.requesterId,
+        status: 'playing',
+        startedAt: serverTimestamp(),
+        volume: player.getVolume(),
+        queueKey: song.key
+    };
+    await update(ref(db), updates);
+    loadAndPlay(song.videoId);
+}
+
+async function playNextSong() {
+    // Only Leader controls the playlist
+    if (!isAmILeader()) {
+        console.log("Not leader, ignoring auto-next (playNextSong).");
+        return;
+    }
+    const queueRef = ref(db, `rooms/${roomId}/queue`);
+    const snapshot = await get(queueRef);
+
+    if (snapshot.exists()) {
+        const songs = snapshot.val();
+        const sortedSongs = Object.keys(songs).map(key => ({
+            key, ...songs[key]
+        })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+
+        if (sortedSongs.length === 0) return;
+
+        let nextIndex = 0;
+
+        if (isShuffle) {
+            // Uniformly pick from other songs to avoid bias
+            const otherIndices = sortedSongs.map((_, i) => i)
+                .filter(i => !currentSongData || !currentSongData.queueKey || sortedSongs[i].key !== currentSongData.queueKey);
+
+            if (otherIndices.length > 0) {
+                const rand = Math.floor(Math.random() * otherIndices.length);
+                nextIndex = otherIndices[rand];
+            } else {
+                nextIndex = 0; // Only one song available
+            }
+        } else {
+            if (currentSongData && currentSongData.queueKey) {
+                const currentIndex = sortedSongs.findIndex(s => s.key === currentSongData.queueKey);
+                if (currentIndex !== -1 && currentIndex < sortedSongs.length - 1) {
+                    nextIndex = currentIndex + 1;
+                } else if (currentIndex === sortedSongs.length - 1) {
+                    nextIndex = 0; // Loop to start
+                }
+            }
+        }
+
+        playSong(sortedSongs[nextIndex]);
+    } else {
+        setIdle();
+    }
+}
+
+async function playPrevSong() {
+    // Only Leader controls the playlist
+    if (!isAmILeader()) {
+        console.log("Not leader, ignoring prev (playPrevSong).");
+        return;
+    }
+    const queueRef = ref(db, `rooms/${roomId}/queue`);
+    const snapshot = await get(queueRef);
+
+    if (snapshot.exists()) {
+        const songs = snapshot.val();
+        const sortedSongs = Object.keys(songs).map(key => ({
+            key, ...songs[key]
+        })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+
+        if (sortedSongs.length === 0) return;
+
+        let prevIndex = 0;
+        if (currentSongData && currentSongData.queueKey) {
+            const currentIndex = sortedSongs.findIndex(s => s.key === currentSongData.queueKey);
+            if (currentIndex > 0) {
+                prevIndex = currentIndex - 1;
+            } else {
+                prevIndex = sortedSongs.length - 1; // Loop to end
+            }
+        }
+
+        playSong(sortedSongs[prevIndex]);
+    } else {
+        setIdle();
+    }
+}
+
+async function setIdle() {
+    resetProgressBar();
+    await update(ref(db, `rooms/${roomId}/current_playback`), {
+        status: 'idle',
+        title: t('waiting_requests'),
+        artist: t('add_song_msg'),
+        videoId: null,
+        thumbnail: null,
+        requester: null,
+        queueKey: null
+    });
+    setVisuals(false);
+}
+
+// Autoplay Policy Handler
+const startOverlay = document.getElementById('start-overlay');
+if (startOverlay) {
+    startOverlay.addEventListener('click', () => {
+        startOverlay.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => startOverlay.remove(), 500);
+
+        // Attempt to resume playback if state is playing
+        if (currentSongData && currentSongData.status === 'playing' && player && isPlayerReady) {
+            player.playVideo();
+        }
+    });
+}
+
+function loadAndPlay(videoId, startSeconds = 0) {
+    if (!isPlayerReady || !videoId) return;
+    currentVideoId = videoId;
+    if (startSeconds > 0) {
+        player.loadVideoById({ videoId: videoId, startSeconds: startSeconds });
+    } else {
+        player.loadVideoById(videoId);
+    }
+    // Force play attempt to ensure autoplay works or resumes correctly
+    setTimeout(() => {
+        if (player && typeof player.getPlayerState === 'function') {
+            const state = player.getPlayerState();
+            if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) {
+                player.playVideo();
+            }
+        }
+    }, 200);
+}
+
+function setVisuals(isPlaying) {
+    const state = isPlaying ? 'running' : 'paused';
+    lpContainer.style.animationPlayState = state;
+
+    if (isPlaying) {
+        miniPlayIcon.classList.add('hidden');
+        miniPauseIcon.classList.remove('hidden');
+        fullPlayIcon.classList.add('hidden');
+        fullPauseIcon.classList.remove('hidden');
+    } else {
+        miniPlayIcon.classList.remove('hidden');
+        miniPauseIcon.classList.add('hidden');
+        fullPlayIcon.classList.remove('hidden');
+        fullPauseIcon.classList.add('hidden');
+    }
+}
+
+// UI Updates
+function initListeners() {
+    const playbackRef = ref(db, `rooms/${roomId}/current_playback`);
+    onValue(playbackRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        if (!data) return;
+
+        currentSongData = data;
+        // updateHostUI(data); // MOVED: Called at the end to prevent prematurely updating currentVideoId
+
+        if (player && isPlayerReady) {
+            const pState = player.getPlayerState();
+
+            // Priority: If videoId changed, load the new song
+            if (data.videoId && data.videoId !== currentVideoId) {
+                let startSeconds = 0;
+                if (data.startedAt) {
+                    const elapsed = (Date.now() - data.startedAt) / 1000;
+                    if (elapsed > 0) startSeconds = elapsed;
+                }
+                if (data.status === 'playing') {
+                    loadAndPlay(data.videoId, startSeconds);
+                } else {
+                    // Paused state - cue the video
+                    if (startSeconds > 0) {
+                        player.cueVideoById({ videoId: data.videoId, startSeconds: startSeconds });
+                    } else {
+                        player.cueVideoById(data.videoId);
+                    }
+                    currentVideoId = data.videoId;
+                    setVisuals(false);
+                }
+            } else if (data.status === 'playing' && pState !== 1 && pState !== 3) {
+                // Same song, but need to resume
+                player.playVideo();
+            } else if (data.status === 'paused') {
+                if (pState === 1) {
+                    // Playing -> Paused
+                    player.pauseVideo();
+                }
+                setVisuals(false);
+
+                // Update Progress Visuals manually since loop is paused
+                if (data.elapsed && player && player.getDuration) {
+                    const current = data.elapsed;
+                    const duration = player.getDuration();
+                    // Duration might be 0 if just cued and metadata not loaded yet.
+                    // We can try to set it, or wait. 
+                    if (duration > 0) {
+                        const percent = (current / duration) * 100;
+                        progressBarMini.style.setProperty('transition', 'none', 'important');
+                        fullProgressBar.style.setProperty('transition', 'none', 'important');
+
+                        progressBarMini.style.width = `${percent}%`;
+                        fullProgressBar.style.width = `${percent}%`;
+
+                        progCurrent.textContent = formatTime(current);
+                        progDuration.textContent = formatTime(duration);
+
+                        setTimeout(() => {
+                            progressBarMini.style.removeProperty('transition');
+                            fullProgressBar.style.removeProperty('transition');
+                        }, 100);
+                    } else {
+                        // Fallback: If duration unknown, just show current time
+                        progCurrent.textContent = formatTime(current);
+                        // Retry shortly after to get duration
+                        setTimeout(() => {
+                            if (player && player.getDuration) {
+                                const dur = player.getDuration();
+                                if (dur > 0) {
+                                    const per = (current / dur) * 100;
+                                    progressBarMini.style.setProperty('transition', 'none', 'important');
+                                    fullProgressBar.style.setProperty('transition', 'none', 'important');
+
+                                    progressBarMini.style.width = `${per}%`;
+                                    fullProgressBar.style.width = `${per}%`;
+
+                                    progDuration.textContent = formatTime(dur);
+
+                                    setTimeout(() => {
+                                        progressBarMini.style.removeProperty('transition');
+                                        fullProgressBar.style.removeProperty('transition');
+                                    }, 100);
+                                }
+                            }
+                        }, 500);
+                    }
+                }
+            } else if (data.status === 'playing' && pState === 1) { // Already playing, check sync
+                // Case: Host A plays Song A. Host B plays Song B.
+                // Host A gets update. Status is playing, pState is playing.
+                // We MUST check if videoId changed.
+                if (data.videoId && data.videoId !== currentVideoId) {
+                    let startSeconds = 0;
+                    if (data.startedAt) {
+                        const elapsed = (Date.now() - data.startedAt) / 1000;
+                        if (elapsed > 0) startSeconds = elapsed;
+                    }
+                    loadAndPlay(data.videoId, startSeconds);
+                } else if (data.startedAt && !isScrubbing) {
+                    const expectedTime = (Date.now() - data.startedAt) / 1000;
+                    const currentTime = player.getCurrentTime();
+                    // If drift is > 2 seconds, seek
+                    if (Math.abs(currentTime - expectedTime) > 2) {
+                        console.log(`Syncing playback: Local ${currentTime.toFixed(2)}s, Expected ${expectedTime.toFixed(2)}s`);
+                        player.seekTo(expectedTime);
+                    }
+                }
+            } else if (data.status === 'skip') {
+                playNextSong();
+            }
+
+            // Check for commands (like restart from remote)
+            // But we need a separate listener for commands as it's a different node.
+            // See initListeners extra block below.
+
+            if (data.volume !== undefined) {
+                player.setVolume(data.volume);
+                hostVolume.value = data.volume;
+                fullVolume.value = data.volume;
+                // Update fill elements
+                const hostVolumeFill = document.getElementById('host-volume-fill');
+                const fullVolumeFill = document.getElementById('full-volume-fill');
+                if (hostVolumeFill) hostVolumeFill.style.width = `${data.volume}%`;
+                if (fullVolumeFill) fullVolumeFill.style.width = `${data.volume}%`;
+                // Update mute icon
+                updateMuteIcon(data.volume);
+                // Update mute icon
+                updateMuteIcon(data.volume);
+            }
+        }
+
+        // Move UI update to the end so currentVideoId comparison above works correctly
+        updateHostUI(data);
+
+        // Re-render queue to update active song highlighting
+        renderHostQueue();
+
+        const listItems = document.querySelectorAll('.song-item');
+        const isPaused = data.status !== 'playing';
+
+        listItems.forEach(el => {
+            const isPlaying = el.dataset.key === data.queueKey;
+            const thumbContainer = el.querySelector('.thumb-container');
+
+            if (isPlaying) {
+                el.classList.remove('hover:bg-white/10');
+                el.style.backgroundColor = '#2a1f16';
+                el.classList.add('border-brand-neon/50');
+                el.classList.remove('border-white/5');
+                el.querySelector('.title-text')?.classList.add('text-brand-neon');
+
+                // Add equalizer overlay if not present
+                if (thumbContainer && !thumbContainer.querySelector('.equalizer-overlay')) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'equalizer-overlay absolute inset-0 bg-black/60 flex items-center justify-center';
+                    overlay.innerHTML = `<div class="equalizer-bar ${isPaused ? 'paused' : ''}"><span></span><span></span><span></span></div>`;
+                    thumbContainer.appendChild(overlay);
+                } else if (thumbContainer) {
+                    // Update paused class on existing equalizer
+                    const eqBar = thumbContainer.querySelector('.equalizer-bar');
+                    if (eqBar) {
+                        if (isPaused) eqBar.classList.add('paused');
+                        else eqBar.classList.remove('paused');
+                    }
+                }
+            } else {
+                el.classList.add('hover:bg-white/10');
+                el.style.backgroundColor = '#1E1E1E';
+                el.classList.remove('border-brand-neon/50');
+                el.classList.add('border-white/5');
+                el.querySelector('.title-text')?.classList.remove('text-brand-neon');
+                el.querySelector('.equalizer-overlay')?.remove();
+            }
+        });
+    });
+
+    const queueRef = ref(db, `rooms/${roomId}/queue`);
+    onValue(queueRef, (snapshot) => {
+        if (isDragging) return;
+        currentQueueSnapshot = snapshot;
+        renderHostQueue();
+    });
+
+    // Listen for Commands (Restart, Previous, Next)
+    const commandsRef = ref(db, `rooms/${roomId}/commands`);
+    onValue(commandsRef, (snapshot) => {
+        const cmd = snapshot.val();
+        if (cmd && player && isPlayerReady) {
+            // Only Leader executes commands to prevent duplicate actions
+            if (!isAmILeader()) return;
+
+            if (cmd.action === 'restart') {
+                player.seekTo(0);
+                player.playVideo();
+                set(commandsRef, null);
+            } else if (cmd.action === 'previous') {
+                playPrevSong();
+                set(commandsRef, null);
+            } else if (cmd.action === 'next') {
+                playNextSong();
+                set(commandsRef, null);
+            } else if (cmd.action === 'seek' && cmd.seekTo !== undefined) {
+                player.seekTo(cmd.seekTo, true);
+                set(commandsRef, null);
+            } else if (cmd.action === 'playByKey' && cmd.key) {
+                window.playSongByKey(cmd.key);
+                set(commandsRef, null);
+            } else if (cmd.action === 'pause') {
+                player.pauseVideo();
+                set(commandsRef, null);
+            } else if (cmd.action === 'resume') {
+                player.playVideo();
+                set(commandsRef, null);
+            }
+        }
+    });
+
+    // Listen for Shuffle state changes
+    const shuffleRef = ref(db, `rooms/${roomId}/info/shuffle`);
+    onValue(shuffleRef, (snapshot) => {
+        const isShuffled = snapshot.val() === true;
+        updateShuffleUI(isShuffled);
+    });
+
+    // Listen for Repeat state changes
+    const repeatRef = ref(db, `rooms/${roomId}/info/repeatMode`);
+    onValue(repeatRef, (snapshot) => {
+        const mode = snapshot.val() || 'all';
+        updateRepeatUI(mode);
+    });
+
+    // Listen for last controller updates
+    onValue(ref(db, `rooms/${roomId}/lastController`), (snapshot) => {
+        const data = snapshot.val();
+        if (data && lastControllerName) {
+            lastControllerName.textContent = data.name || '-';
+        }
+    });
+
+    renderHostQueue();
+}
+
+function renderHostQueue() {
+    const list = document.getElementById('queue-list');
+    const countEl = document.getElementById('queue-count');
+
+    if (!list || !currentQueueSnapshot) return;
+
+    // Save scroll position before re-render
+    const scrollPos = list.parentElement ? list.parentElement.scrollTop : 0;
+
+    // list.innerHTML = ''; // Removed to allow DOM diffing
+
+    if (!currentQueueSnapshot.exists()) {
+        list.innerHTML = `<div class="text-center text-gray-500 py-12">${t('no_songs_queue')}</div>`;
+        if (countEl) countEl.textContent = t('songs_count', { count: 0 });
+        return;
+    }
+
+    const songs = currentQueueSnapshot.val();
+    const sortedSongs = Object.keys(songs).map(key => ({
+        key, ...songs[key]
+    })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+
+    if (countEl) countEl.textContent = t('songs_count', { count: sortedSongs.length });
+
+    // Remove any non-keyed elements (like "No songs" message)
+    Array.from(list.children).forEach(child => {
+        if (!child.dataset.key) child.remove();
+    });
+
+    // Determine initial control state for rendering
+    // Dynamic control check for event listeners
+    const checkCanControl = () => isAmILeader() || isSharedControl;
+    const canControl = checkCanControl(); // For initial rendering state
+
+    // Helper to create a new song item
+    const createSongItem = (song) => {
+        // Create wrapper for swipe functionality
+        const wrapper = document.createElement('div');
+        wrapper.className = `relative overflow-hidden rounded-xl mb-2 queue-item-wrapper ${canControl ? 'sortable-item' : ''}`;
+        wrapper.dataset.key = song.key;
+        // Ensure initial control check
+        const songCanControl = checkCanControl();
+
+        // Delete background (revealed on swipe) - positioned on right
+        const deleteBg = document.createElement('div');
+        deleteBg.className = 'delete-bg absolute inset-0 bg-red-500 flex items-center justify-end pr-4 rounded-xl';
+        deleteBg.innerHTML = `
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+        `;
+        wrapper.appendChild(deleteBg);
+
+        // Song item (swipeable) - needs solid background to cover red delete bg
+        const el = document.createElement('div');
+        el.className = 'song-item p-3 rounded-xl flex items-center gap-2 transition-transform border relative';
+        el.dataset.key = song.key;
+        el.style.touchAction = 'pan-y';
+
+        wrapper.appendChild(el);
+
+        // Attach Event Listeners (One time setup)
+        // Swipe logic
+        let startX = 0;
+        let currentX = 0;
+        let isSwiping = false;
+        const deleteThreshold = -100;
+
+        const handleStart = (clientX, target) => {
+            if (!checkCanControl()) return;
+            if (target.closest('.drag-handle')) return;
+            startX = clientX;
+            isSwiping = true;
+            el.style.transition = 'none';
+        };
+
+        const handleMove = (clientX) => {
+            if (!isSwiping) return;
+            currentX = clientX - startX;
+            if (currentX < 0) {
+                el.style.transform = `translateX(${Math.max(currentX, -150)}px)`;
+            }
+        };
+
+        const handleEnd = () => {
+            if (!isSwiping) return;
+            isSwiping = false;
+            el.style.transition = 'transform 0.3s ease';
+            if (currentX < deleteThreshold) {
+                el.style.transform = 'translateX(-100%)';
+                setTimeout(() => deleteSong(song.key), 200);
+            } else {
+                el.style.transform = 'translateX(0)';
+            }
+            currentX = 0;
+        };
+
+        el.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target), { passive: true });
+        el.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), { passive: true });
+        el.addEventListener('touchend', handleEnd);
+
+        el.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            handleStart(e.clientX, e.target);
+            const onMouseMove = (me) => handleMove(me.clientX);
+            const onMouseUp = () => {
+                handleEnd();
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        // Double click to play
+        let lastClickTime = 0;
+        el.addEventListener('click', (e) => {
+            if (e.target.closest('.drag-handle')) return;
+            // Check control permission for playing? Yes, implies control.
+            if (!checkCanControl()) return;
+
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - lastClickTime;
+
+            if (timeDiff < 300 && timeDiff > 0) {
+                playSongByKey(song.key);
+                lastClickTime = 0; // Reset
+            } else {
+                lastClickTime = currentTime;
+            }
+        });
+
+        return wrapper;
+    };
+
+    // Track existing keys
+    const existingElements = new Map();
+    // Re-query ensuring we get the wrappers
+    Array.from(list.children).forEach(child => {
+        if (child.dataset.key) existingElements.set(child.dataset.key, child);
+    });
+
+    const currentKeys = new Set();
+
+    sortedSongs.forEach((song) => {
+        currentKeys.add(song.key);
+        const isActive = currentSongData && currentSongData.queueKey === song.key;
+        const isMySong = currentUser && song.requesterId === currentUser.uid;
+
+        let wrapper = existingElements.get(song.key);
+        if (!wrapper) {
+            wrapper = createSongItem(song);
+        }
+
+        // Apply Updates (Incremental)
+        const el = wrapper.querySelector('.song-item');
+
+        // 1. Wrapper Class (Sortable)
+        // Always toggle sortable-item based on CURRENT global state
+        if (canControl) wrapper.classList.add('sortable-item');
+        else wrapper.classList.remove('sortable-item');
+
+        // Ensure wrapper class has queue-item-wrapper if we missed it
+        wrapper.classList.add('queue-item-wrapper');
+
+        // 2. Song Item Styling
+        el.classList.remove('border-brand-neon/50', 'border-white/5', 'cursor-grab', 'active:cursor-grabbing');
+        if (isActive) {
+            el.classList.add('border-brand-neon/50');
+            el.style.backgroundColor = '#2a1f16';
+        } else {
+            el.classList.add('border-white/5');
+            el.style.backgroundColor = '#1E1E1E';
+        }
+        if (canControl) el.classList.add('cursor-grab', 'active:cursor-grabbing');
+
+        // 3. Content Update
+        el.innerHTML = `
+            ${canControl ? '<div class="w-6 text-gray-500 text-center drag-handle cursor-grab">≡</div>' : ''}
+            <div class="thumb-container w-12 h-12 bg-gray-800 rounded-md overflow-hidden flex-shrink-0 relative">
+                <img src="${song.thumbnail || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" class="w-full h-full object-cover">
+                ${isActive ? `
+                <div class="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <div class="equalizer-bar small ${currentSongData?.status !== 'playing' ? 'paused' : ''}"><span></span><span></span><span></span></div>
+                </div>` : ''}
+            </div>
+            <div class="flex-1 min-w-0 pr-2">
+                <h4 class="title-text font-bold truncate text-sm ${isActive ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.title)}</h4>
+                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.requester)}</span></p>
+            </div>
+            <span class="duration-text text-xs text-gray-500 flex-shrink-0 hidden sm:block">${song.duration ? formatTime(song.duration) : '--:--'}</span>
+        `;
+
+        // 4. Append to list (automatically moves existing elements)
+        list.appendChild(wrapper);
+    });
+
+    // Cleanup removed items
+    existingElements.forEach((wrapper, key) => {
+        if (!currentKeys.has(key)) {
+            wrapper.remove();
+        }
+    });
+
+    // Restore scroll
+    if (list.parentElement) list.parentElement.scrollTop = scrollPos;
+
+    // SortableJS Management
+    if (canControl) {
+        if (!sortableInstance) {
+            sortableInstance = new Sortable(list, {
+                animation: 150,
+                handle: '.drag-handle',
+                draggable: '.sortable-item',
+                onStart: function () {
+                    isDragging = true;
+                },
+                onEnd: function (evt) {
+                    const items = list.querySelectorAll('.sortable-item');
+                    const updates = {};
+                    items.forEach((item, index) => {
+                        const key = item.dataset.key;
+                        updates[`rooms/${roomId}/queue/${key}/order`] = index;
+                    });
+                    update(ref(db), updates).then(() => {
+                        setTimeout(() => { isDragging = false; }, 500);
+                    });
+                }
+            });
+        }
+        sortableInstance.option('disabled', false);
+    } else {
+        if (sortableInstance) {
+            sortableInstance.option('disabled', true);
+        }
+    }
+}
+
+
+
+window.playSongByKey = async (key) => {
+    if (!isAmILeader()) {
+        if (!isSharedControl) {
+            // Silently ignore as per user request
+            return;
+        }
+        // Delegate to Leader
+        const commandsRef = ref(db, `rooms/${roomId}/commands`);
+        set(commandsRef, { action: 'playByKey', key: key, timestamp: serverTimestamp() });
+        return;
+    }
+
+    // Fix: Redefine queueRef locally as it's not in scope
+    const queueRef = ref(db, `rooms/${roomId}/queue`);
+    const snapshot = await get(queueRef);
+    if (snapshot.exists()) {
+        const songs = snapshot.val();
+        if (songs[key]) playSong({ key, ...songs[key] });
+    }
+};
+
+window.deleteSong = async (key) => {
+    if (!isAmILeader() && !isSharedControl) {
+        toast.show(t('host_control_only'));
+        return;
+    }
+    const songRef = ref(db, `rooms/${roomId}/queue/${key}`);
+    const snapshot = await get(songRef);
+
+    if (snapshot.exists()) {
+        const songData = snapshot.val();
+
+        if (currentSongData && currentSongData.queueKey === key) {
+            // If deleting currently playing, skip first then delete
+            playNextSong();
+        }
+
+        // Optimistic Remove
+        remove(songRef);
+
+        // Show Toast with Undo
+        toast.show(t('song_deleted', { title: decodeHtmlEntities(songData.title) }), {
+            duration: 5000,
+            undoText: t('undo'),
+            onUndo: async () => {
+                await set(songRef, songData);
+                toast.show(t('action_undone'));
+            }
+        });
+    }
+};
+
+
+function updateHostUI(data) {
+    const defImg = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    let title = decodeHtmlEntities(data.title) || t('waiting_requests');
+    let artist = decodeHtmlEntities(data.artist) || t('unknown');
+    const img = data.thumbnail || defImg;
+    const hiResImg = data.videoId ? getHighResThumbnail(data.videoId) : img;
+
+    // Force localized text for idle state
+    if (data.status === 'idle') {
+        title = t('waiting_requests');
+        artist = t('add_song_msg');
+    }
+
+    miniTitle.textContent = title;
+    miniArtist.textContent = artist;
+    miniArt.src = img;
+
+    fullTitle.textContent = title;
+    fullArtist.textContent = artist;
+    fullArt.src = hiResImg;
+    bgArt.src = hiResImg;
+    fullRequester.textContent = data.requester || 'System';
+
+    // Use global likes instead of room-specific likes for persistence
+    // Note: We use a separate tracking variable because currentVideoId is updated elsewhere before updateHostUI is called
+    if (data.videoId) {
+        // Check if we need to register a new listener (different video or first load)
+        const likesListenerVideoId = fullLikes.dataset.currentVideoId;
+        if (data.videoId !== likesListenerVideoId) {
+            // Cleanup old listener
+            if (likesListenerVideoId) {
+                off(ref(db, `songs/${likesListenerVideoId}/totalLikes`));
+            }
+            // Store the video ID we're listening to
+            fullLikes.dataset.currentVideoId = data.videoId;
+
+            // Start new reactive listener
+            onValue(ref(db, `songs/${data.videoId}/totalLikes`), (snapshot) => {
+                fullLikes.textContent = snapshot.val() || 0;
+            });
+        }
+    } else {
+        // Idle state: cleanup
+        const likesListenerVideoId = fullLikes.dataset.currentVideoId;
+        if (likesListenerVideoId) {
+            off(ref(db, `songs/${likesListenerVideoId}/totalLikes`));
+            delete fullLikes.dataset.currentVideoId;
+        }
+        fullLikes.textContent = 0;
+    }
+
+    // Apply marquee if full player is visible
+    if (!fullPlayer.classList.contains('hidden')) {
+        applyMarquee(title);
+    } else {
+        // Store title for later marquee application when full player opens
+        fullTitle.dataset.originalTitle = title;
+        fullTitle.textContent = title;
+    }
+}
+
+// Marquee Logic for Fullscreen Title (Seamless Loop)
+let currentMarqueeTitle = null;
+function applyMarquee(title) {
+    if (!title) title = fullTitle.dataset.originalTitle || fullTitle.textContent.split('        •')[0].trim();
+    if (!title) return;
+
+    // Skip if marquee is already running with the same title
+    if (fullTitle.classList.contains('animate-marquee') && currentMarqueeTitle === title) {
+        return;
+    }
+
+    // Delay slightly to ensure fonts/layout are ready
+    setTimeout(() => {
+        // Double-check in case something changed during the delay
+        if (fullTitle.classList.contains('animate-marquee') && currentMarqueeTitle === title) {
+            return;
+        }
+
+        fullTitle.classList.remove('animate-marquee');
+        fullTitle.textContent = title; // Reset to original title first
+        void fullTitle.offsetWidth; // Trigger reflow
+
+        // Apply if text overflows the parent container
+        const parentWidth = fullTitle.parentElement.clientWidth;
+        if (fullTitle.scrollWidth > parentWidth) {
+            // Duplicate title with separator for seamless loop
+            fullTitle.textContent = title + '        •        ' + title + '        •        ';
+            fullTitle.classList.add('animate-marquee');
+            currentMarqueeTitle = title;
+        } else {
+            currentMarqueeTitle = null;
+        }
+    }, 100);
+}
+
+// UI Interactions
+// Set full player height to actual viewport height (fixes iOS Safari issue)
+function setFullPlayerHeight() {
+    const vh = window.innerHeight;
+    fullPlayer.style.height = `${vh}px`;
+    fullPlayer.style.minHeight = `${vh}px`;
+    fullPlayer.style.maxHeight = `${vh}px`;
+}
+
+// Update height on resize
+window.addEventListener('resize', () => {
+    if (!fullPlayer.classList.contains('hidden')) {
+        setFullPlayerHeight();
+    }
+});
+
+// Handle orientation change with multiple delayed updates (iOS Safari needs time)
+window.addEventListener('orientationchange', () => {
+    if (!fullPlayer.classList.contains('hidden')) {
+        // Multiple updates to catch the final viewport size
+        setTimeout(setFullPlayerHeight, 100);
+        setTimeout(setFullPlayerHeight, 300);
+        setTimeout(setFullPlayerHeight, 500);
+    }
+});
+
+expandPlayerBtn.addEventListener('click', () => {
+    setFullPlayerHeight();
+    fullPlayer.classList.remove('hidden', 'translate-y-full');
+    fullPlayer.style.display = 'flex';
+    fullPlayer.style.transform = 'translateY(0)';
+    fullPlayer.style.webkitTransform = 'translateY(0)';
+    applyMarquee(); // Apply marquee when full player opens
+});
+collapsePlayerBtn.addEventListener('click', () => {
+    fullPlayer.classList.add('translate-y-full');
+    fullPlayer.style.transform = 'translateY(100%)';
+    fullPlayer.style.webkitTransform = 'translateY(100%)';
+    setTimeout(() => {
+        fullPlayer.classList.add('hidden');
+        fullPlayer.style.display = 'none';
+    }, 500); // Wait for transition
+});
+miniArt.parentElement.addEventListener('click', () => {
+    setFullPlayerHeight();
+    fullPlayer.classList.remove('hidden', 'translate-y-full');
+    fullPlayer.style.display = 'flex';
+    fullPlayer.style.transform = 'translateY(0)';
+    fullPlayer.style.webkitTransform = 'translateY(0)';
+    applyMarquee(); // Apply marquee when full player opens
+});
+
+// Close Settings on outside click
+document.addEventListener('click', (e) => {
+    if (settingsOverlay && !settingsOverlay.classList.contains('hidden') &&
+        !settingsOverlay.contains(e.target) &&
+        settingsBtn && !settingsBtn.contains(e.target)) {
+        settingsOverlay.classList.add('hidden');
+    }
+
+    // Close Top Search on outside click
+    if (!hostSearchResultsTop.classList.contains('hidden') &&
+        !hostSearchResultsTop.contains(e.target) &&
+        !hostSearchInputTop.contains(e.target)) {
+        hostSearchResultsTop.classList.add('hidden');
+    }
+
+    // Close Host Lang Popover
+    if (!hostLangPopover.classList.contains('hidden') &&
+        !hostLangPopover.contains(e.target) &&
+        !flagBtnHost.contains(e.target)) {
+        hostLangPopover.classList.add('hidden');
+    }
+});
+
+// Volume
+window.updateVolume = function (val) {
+    let volume = parseInt(val);
+    if (isNaN(volume)) volume = 50;
+    volume = Math.max(0, Math.min(100, volume));
+
+    // Update player volume
+    if (player && typeof player.setVolume === 'function') {
+        try {
+            player.setVolume(volume);
+        } catch (e) {
+            console.warn('Failed to set volume:', e);
+        }
+    }
+    // Sync database
+    if (roomId) {
+        update(ref(db, `rooms/${roomId}/current_playback`), { volume: volume }).catch(e => console.warn(e));
+    }
+    // Sync both slider values
+    const hVol = document.getElementById('host-volume');
+    const fVol = document.getElementById('full-volume');
+    if (hVol && hVol.value != volume) hVol.value = volume;
+    if (fVol && fVol.value != volume) fVol.value = volume;
+
+    // Update fill elements
+    const hostVolumeFill = document.getElementById('host-volume-fill');
+    const fullVolumeFill = document.getElementById('full-volume-fill');
+    if (hostVolumeFill) hostVolumeFill.style.width = volume + '%';
+    if (fullVolumeFill) fullVolumeFill.style.width = volume + '%';
+
+    // Update mute icon
+    updateMuteIcon(volume);
+}
+
+function updateMuteIcon(volume) {
+    const hostVolumeIcon = document.getElementById('host-volume-icon');
+    const hostMuteIcon = document.getElementById('host-mute-icon');
+    const fullVolumeIcon = document.getElementById('full-volume-icon');
+    const fullMuteIcon = document.getElementById('full-mute-icon');
+
+    if (volume > 0) {
+        hostVolumeIcon?.classList.remove('hidden');
+        hostMuteIcon?.classList.add('hidden');
+        fullVolumeIcon?.classList.remove('hidden');
+        fullMuteIcon?.classList.add('hidden');
+    } else {
+        hostVolumeIcon?.classList.add('hidden');
+        hostMuteIcon?.classList.remove('hidden');
+        fullVolumeIcon?.classList.add('hidden');
+        fullMuteIcon?.classList.remove('hidden');
+    }
+}
+hostVolume.addEventListener('input', (e) => updateVolume(e.target.value));
+fullVolume.addEventListener('input', (e) => updateVolume(e.target.value));
+
+// Touch-to-seek for volume sliders (tap to set position)
+function handleSliderTouch(slider, updateFn) {
+    const setValueFromTouch = (e) => {
+        const touch = e.touches[0] || e.changedTouches[0];
+        const rect = slider.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        slider.value = percent;
+        updateFn(percent);
+    };
+    slider.addEventListener('touchstart', setValueFromTouch, { passive: true });
+    slider.addEventListener('touchmove', setValueFromTouch, { passive: true });
+}
+handleSliderTouch(hostVolume, updateVolume);
+handleSliderTouch(fullVolume, updateVolume);
+
+// Mute Toggle
+let previousVolume = 100;
+const hostMuteToggle = document.getElementById('host-mute-toggle');
+const hostVolumeIcon = document.getElementById('host-volume-icon');
+const hostMuteIcon = document.getElementById('host-mute-icon');
+
+if (hostMuteToggle) {
+    hostMuteToggle.addEventListener('click', () => {
+        const currentVolume = hostVolume.value;
+        if (parseInt(currentVolume) > 0) {
+            // Mute
+            previousVolume = currentVolume;
+            if (player && typeof player.mute === 'function') player.mute();
+            updateVolume(0);
+            hostVolume.value = 0;
+            fullVolume.value = 0;
+            hostVolumeIcon?.classList.add('hidden');
+            hostMuteIcon?.classList.remove('hidden');
+        } else {
+            // Unmute
+            if (player && typeof player.unMute === 'function') player.unMute();
+            updateVolume(previousVolume);
+            hostVolume.value = previousVolume;
+            fullVolume.value = previousVolume;
+            hostVolumeIcon?.classList.remove('hidden');
+            hostMuteIcon?.classList.add('hidden');
+        }
+    });
+}
+
+// Fullscreen Mute Toggle
+const fullMuteToggle = document.getElementById('full-mute-toggle');
+if (fullMuteToggle) {
+    fullMuteToggle.addEventListener('click', () => {
+        const currentVolume = fullVolume.value;
+        if (parseInt(currentVolume) > 0) {
+            previousVolume = currentVolume;
+            if (player && typeof player.mute === 'function') player.mute();
+            updateVolume(0);
+            hostVolume.value = 0;
+            fullVolume.value = 0;
+        } else {
+            if (player && typeof player.unMute === 'function') player.unMute();
+            updateVolume(previousVolume);
+            hostVolume.value = previousVolume;
+            fullVolume.value = previousVolume;
+        }
+    });
+}
+
+// iOS Detection to hide volume controls (Volume/Mute not supported via JS on iOS)
+function isIOS() {
+    return [
+        'iPad Simulator',
+        'iPhone Simulator',
+        'iPod Simulator',
+        'iPad',
+        'iPhone',
+        'iPod'
+    ].includes(navigator.platform)
+        // iPad on iOS 13 detection
+        || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+}
+
+if (isIOS()) {
+    const volumeControls = document.querySelectorAll('#host-volume-fill, #host-volume, #host-mute-toggle, #full-mute-toggle, #full-volume-fill, #full-volume');
+    // We should hide the CONTAINER of these controls to be cleaner. Use IDs of parent divs if possible, or hide explicit elements.
+    // Let's hide the specific toggle buttons and sliders.
+    // Better: hide the parent container if possible, but structure might vary.
+    // Simple approach: Hide the elements we know.
+
+    // Main UI Volume container
+    const hostVolContainer = document.querySelector('.volume-control-group'); // Check class in index.html?
+    // Actually, let's target the exact IDs for buttons and the slider containers.
+
+    const hostMuteBtn = document.getElementById('host-mute-toggle');
+    const fullMuteBtn = document.getElementById('full-mute-toggle');
+
+    // For sliders, they are wrapped in a relative div usually.
+    // Let's just hide the mute buttons and the slider inputs, effectively disabling them visually.
+
+    if (hostMuteBtn) {
+        hostMuteBtn.style.display = 'none'; // Hide mute toggle
+        // Also hide the slider next to it
+        if (hostVolume) hostVolume.parentElement.style.display = 'none';
+    }
+
+    if (fullMuteBtn) {
+        fullMuteBtn.parentElement.style.display = 'none'; // Hide the whole volume block in fullscreen
+    }
+}
+
+// Toggle Shuffle - Just toggle state in DB, random playback is handled by playNextSong
+const toggleShuffle = async () => {
+    if (!roomId) return;
+
+    const shuffleRef = ref(db, `rooms/${roomId}/info/shuffle`);
+    const shuffleSnap = await get(shuffleRef);
+    const newShuffleState = shuffleSnap.val() !== true;
+
+    await set(shuffleRef, newShuffleState);
+    updateShuffleUI(newShuffleState);
+};
+
+// Update shuffle button UI
+const updateShuffleUI = (isOn) => {
+    isShuffle = isOn;
+    if (isOn) {
+        miniShuffleBtn?.classList.add('text-brand-neon');
+        miniShuffleBtn?.classList.remove('text-gray-400');
+        fullShuffleBtn?.classList.add('text-brand-neon');
+        fullShuffleBtn?.classList.remove('text-gray-400');
+    } else {
+        miniShuffleBtn?.classList.remove('text-brand-neon');
+        miniShuffleBtn?.classList.add('text-gray-400');
+        fullShuffleBtn?.classList.remove('text-brand-neon');
+        fullShuffleBtn?.classList.add('text-gray-400');
+    }
+};
+
+miniShuffleBtn.addEventListener('click', toggleShuffle);
+if (fullShuffleBtn) fullShuffleBtn.addEventListener('click', toggleShuffle);
+
+// Toggle Repeat
+const toggleRepeat = async () => {
+    if (!roomId) return;
+    const infoRef = ref(db, `rooms/${roomId}/info/repeatMode`);
+    const snap = await get(infoRef);
+    const intent = snap.val() === 'one' ? 'all' : 'one';
+    await set(infoRef, intent);
+};
+
+// Update Repeat button UI
+const updateRepeatUI = (mode) => {
+    repeatMode = mode;
+    if (mode === 'one') {
+        miniRepeatBtn?.classList.add('text-brand-neon');
+        miniRepeatBtn?.classList.remove('text-gray-400', 'text-white');
+        miniRepeatIconAll?.classList.add('hidden');
+        miniRepeatIconOne?.classList.remove('hidden');
+
+        fullRepeatBtn?.classList.add('text-brand-neon');
+        fullRepeatBtn?.classList.remove('text-gray-400', 'text-white');
+        fullRepeatIconAll?.classList.add('hidden');
+        fullRepeatIconOne?.classList.remove('hidden');
+    } else {
+        miniRepeatBtn?.classList.remove('text-brand-neon');
+        miniRepeatBtn?.classList.add('text-gray-400');
+        miniRepeatIconAll?.classList.remove('hidden');
+        miniRepeatIconOne?.classList.add('hidden');
+
+        fullRepeatBtn?.classList.remove('text-brand-neon');
+        fullRepeatBtn?.classList.add('text-gray-400');
+        fullRepeatIconAll?.classList.remove('hidden');
+        fullRepeatIconOne?.classList.add('hidden');
+    }
+};
+
+miniRepeatBtn?.addEventListener('click', toggleRepeat);
+fullRepeatBtn?.addEventListener('click', toggleRepeat);
+
+// Play Controls
+const togglePlay = () => {
+    if (!isAmILeader() && !isSharedControl) {
+        toast.show(t('host_control_only'));
+        return;
+    }
+
+    if (isAmILeader()) {
+        if (player.getPlayerState() === 1) player.pauseVideo();
+        else player.playVideo();
+    } else {
+        // Send command
+        const action = player && player.getPlayerState() === 1 ? 'pause' : 'resume';
+        const commandsRef = ref(db, `rooms/${roomId}/commands`);
+        set(commandsRef, {
+            action: action,
+            timestamp: serverTimestamp()
+        });
+    }
+};
+
+const prevSong = () => {
+    if (!isAmILeader() && !isSharedControl) return;
+    if (isAmILeader()) {
+        playPrevSong();
+    } else {
+        const commandsRef = ref(db, `rooms/${roomId}/commands`);
+        set(commandsRef, { action: 'previous', timestamp: serverTimestamp() });
+    }
+};
+
+const nextSong = () => {
+    if (!isAmILeader() && !isSharedControl) return;
+    if (isAmILeader()) {
+        playNextSong();
+    } else {
+        const commandsRef = ref(db, `rooms/${roomId}/commands`);
+        set(commandsRef, { action: 'next', timestamp: serverTimestamp() });
+    }
+};
+
+miniPlayBtn.addEventListener('click', togglePlay);
+fullPlayBtn.addEventListener('click', togglePlay);
+miniPrevBtn.addEventListener('click', prevSong);
+fullPrevBtn.addEventListener('click', prevSong);
+miniNextBtn.addEventListener('click', nextSong);
+fullNextBtn.addEventListener('click', nextSong);
+
+// Heart Button (No Op on Host)
+// fullLikeBtn.addEventListener('click', () => {}); // Removed logic
+
+// Search Logic
+const openSearch = () => {
+    searchOverlay.classList.remove('hidden');
+    hostSearchInput.focus();
+};
+hostSearchBtn.addEventListener('click', openSearch);
+hostSearchInputTop.addEventListener('focus', () => {
+    if (hostSearchResultsTop.innerHTML.trim()) {
+        hostSearchResultsTop.classList.remove('hidden');
+    }
+});
+
+
+
+// New Language Button
+flagBtnHost.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hostLangPopover.classList.toggle('hidden');
+});
+
+hostLangOptions.forEach(opt => {
+    opt.addEventListener('click', (e) => {
+        const lang = opt.dataset.lang;
+        setLanguage(lang);
+        hostLangPopover.classList.add('hidden');
+
+        // Update Flag
+        const icon = lang === 'ko' ? '🇰🇷' : '🇺🇸';
+        flagBtnHost.textContent = icon;
+
+        // Re-render UI components that use dynamic text
+        renderHostQueue();
+        if (currentSongData) updateNowPlaying(currentSongData);
+    });
+});
+
+// Room Info Popover & QR Code
+roomInfoTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    roomInfoPopover.classList.toggle('hidden');
+});
+// Fullscreen QR Code Toggle
+const fullQrToggle = document.getElementById('full-qr-toggle');
+const fullQrWrapper = document.getElementById('full-qr-code-wrapper');
+const fullQrCode = document.getElementById('full-qr-code');
+const fullQrClose = document.getElementById('full-qr-close');
+const fullQrRoomCode = document.getElementById('full-qr-room-code');
+let fullQrGenerated = false;
+
+const showFullQr = () => {
+    fullQrWrapper?.classList.remove('hidden');
+    fullQrToggle?.classList.add('hidden');
+
+    // Generate QR code if not yet generated
+    if (roomId && !fullQrGenerated) {
+        const joinUrl = `${window.location.origin}/${roomId}`;
+        QRCode.toCanvas(fullQrCode, joinUrl, {
+            width: 144,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
+        if (fullQrRoomCode) fullQrRoomCode.textContent = `#${roomId}`;
+        fullQrGenerated = true;
+    }
+};
+
+const hideFullQr = () => {
+    fullQrWrapper?.classList.add('hidden');
+    fullQrToggle?.classList.remove('hidden');
+};
+
+fullQrToggle?.addEventListener('click', showFullQr);
+fullQrClose?.addEventListener('click', hideFullQr);
+
+// Regenerate fullscreen QR when entering fullscreen (in case roomId changes)
+if (typeof expandPlayerBtn !== 'undefined' && expandPlayerBtn) {
+    expandPlayerBtn.addEventListener('click', () => {
+        fullQrGenerated = false;
+    });
+}
+
+
+// Fullscreen Toggle Logic
+const fullFullscreenToggle = document.getElementById('full-fullscreen-toggle');
+const iconEnterFullscreen = document.getElementById('icon-enter-fullscreen');
+const iconExitFullscreen = document.getElementById('icon-exit-fullscreen');
+
+const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message} (${err.name})`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+};
+
+const updateFullscreenIcon = () => {
+    if (document.fullscreenElement) {
+        iconEnterFullscreen?.classList.add('hidden');
+        iconExitFullscreen?.classList.remove('hidden');
+    } else {
+        iconEnterFullscreen?.classList.remove('hidden');
+        iconExitFullscreen?.classList.add('hidden');
+    }
+};
+
+if (fullFullscreenToggle) {
+    fullFullscreenToggle.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', updateFullscreenIcon);
+}
+fullQrClose?.addEventListener('click', hideFullQr);
+
+// Regenerate fullscreen QR when entering fullscreen (in case roomId changes)
+expandPlayerBtn?.addEventListener('click', () => {
+    fullQrGenerated = false;
+});
+
+// Click outside to close popover
+document.addEventListener('click', (e) => {
+    if (!roomInfoPopover.classList.contains('hidden') &&
+        !roomInfoPopover.contains(e.target) &&
+        !roomInfoTrigger.contains(e.target)) {
+        roomInfoPopover.classList.add('hidden');
+    }
+});
+
+
+// Delete Room (New Location)
+// Delete Room or Leave Room (Context Aware)
+document.getElementById('delete-room-btn').addEventListener('click', async () => {
+    if (isAmILeader()) {
+        // Leader: Delete Room
+        if (confirm(t('confirm_delete_room'))) {
+            await remove(ref(db, `rooms/${roomId}`));
+            localStorage.removeItem('host_room_id');
+            location.reload();
+        }
+    } else {
+        // Follower: Leave Room immediately without alert
+        // Remove local session
+        if (currentSessionRef) {
+            await remove(currentSessionRef);
+        }
+        localStorage.removeItem('host_room_id');
+        // Redirect to host landing page to prevent auto-rejoin
+        // We must use '/host/' explicitly to clear the Room ID from the URL
+        window.location.href = '/host/';
+    }
+});
+
+// Shared Control Toggle - initialized after room is entered
+function initRoomSettings() {
+    if (!roomId) return;
+
+    // --- Shared Control Toggle ---
+    if (sharedControlToggle) {
+        // Listen for real-time updates
+        onValue(ref(db, `rooms/${roomId}/info/sharedControl`), (snapshot) => {
+            const isOn = snapshot.val() === true;
+            isSharedControl = isOn;
+            updateToggleUI(sharedControlToggle, isOn);
+            updateControlState();
+        });
+
+        if (!sharedControlToggle.dataset.listenerAdded) {
+            sharedControlToggle.dataset.listenerAdded = 'true';
+            sharedControlToggle.addEventListener('click', async () => {
+                const current = sharedControlToggle.getAttribute('aria-checked') === 'true';
+                const newVal = !current;
+                await update(ref(db, `rooms/${roomId}/info`), { sharedControl: newVal });
+                // updateToggleUI is handled by onValue listener
+            });
+        }
+    }
+
+    // --- Private Room Toggle ---
+    if (privateRoomToggle) {
+        // Listen for real-time updates
+        onValue(ref(db, `rooms/${roomId}/info/isPrivate`), (snapshot) => {
+            const isOn = snapshot.val() === true;
+            updateToggleUI(privateRoomToggle, isOn);
+        });
+
+        if (!privateRoomToggle.dataset.listenerAdded) {
+            privateRoomToggle.dataset.listenerAdded = 'true';
+            privateRoomToggle.addEventListener('click', async () => {
+                const current = privateRoomToggle.getAttribute('aria-checked') === 'true';
+                const newVal = !current;
+                await update(ref(db, `rooms/${roomId}/info`), { isPrivate: newVal });
+                // updateToggleUI is handled by onValue listener
+            });
+        }
+    }
+}
+
+function updateToggleUI(toggleBtn, isOn) {
+    if (!toggleBtn) return;
+    toggleBtn.setAttribute('aria-checked', isOn);
+    const knob = toggleBtn.querySelector('span');
+    if (isOn) {
+        toggleBtn.classList.remove('bg-gray-600');
+        toggleBtn.classList.add('bg-brand-neon');
+        knob.style.transform = 'translateX(1.25rem)';
+        // Only show last controller info for sharedControl
+        if (toggleBtn.id === 'shared-control-toggle') {
+            lastControllerInfo?.classList.remove('hidden');
+        }
+    } else {
+        toggleBtn.classList.remove('bg-brand-neon');
+        toggleBtn.classList.add('bg-gray-600');
+        knob.style.transform = 'translateX(0)';
+        if (toggleBtn.id === 'shared-control-toggle') {
+            lastControllerInfo?.classList.add('hidden');
+        }
+    }
+}
+
+// Search Implementation
+const executeSearch = (query, container, inputEl) => {
+    if (query.length >= 2) {
+        performHostSearch(query, container, inputEl);
+        inputEl.blur(); // Dismiss virtual keyboard on mobile
+    }
+};
+
+const setupSearchInput = (input, clearBtn) => {
+    const checkInput = () => {
+        if (input.value.trim().length > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+    };
+    input.addEventListener('input', checkInput);
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        input.focus();
+        clearBtn.classList.add('hidden');
+    });
+};
+
+setupSearchInput(hostSearchInput, clearSearchBtn);
+setupSearchInput(hostSearchInputTop, clearSearchBtnTop);
+
+// Input Enter Key
+hostSearchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') executeSearch(e.target.value.trim(), hostSearchResults, hostSearchInput);
+});
+hostSearchInputTop.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') executeSearch(e.target.value.trim(), hostSearchResultsTop, hostSearchInputTop);
+});
+
+// Search Button Click
+if (hostSearchSubmit) {
+    hostSearchSubmit.addEventListener('click', () => {
+        executeSearch(hostSearchInput.value.trim(), hostSearchResults, hostSearchInput);
+    });
+}
+if (hostSearchSubmitTop) {
+    hostSearchSubmitTop.addEventListener('click', () => {
+        executeSearch(hostSearchInputTop.value.trim(), hostSearchResultsTop, hostSearchInputTop);
+    });
+}
+
+async function performHostSearch(query, container, inputEl) {
+    if (query.includes('youtube.com') || query.includes('youtu.be')) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = query.match(regExp);
+        if (match && match[2].length === 11) {
+            addToHostQueue({ id: match[2], title: 'Video ' + match[2], thumb: `https://i.ytimg.com/vi/${match[2]}/mqdefault.jpg` });
+            inputEl.value = '';
+            container.classList.add('hidden');
+            searchOverlay.classList.add('hidden');
+            return;
+        }
+    }
+
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`;
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+
+        container.innerHTML = '';
+        container.classList.remove('hidden');
+
+        data.items.forEach(item => {
+            const vid = {
+                id: item.id.videoId,
+                title: item.snippet.title,
+                artist: item.snippet.channelTitle,
+                thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url
+            };
+            const el = document.createElement('div');
+            el.className = 'p-3 flex items-center gap-3 hover:bg-white/10 cursor-pointer border-b border-white/10 last:border-0';
+            el.innerHTML = `
+                <img src="${vid.thumb}" class="w-12 h-9 object-cover rounded">
+                <div class="flex-1 min-w-0">
+                    <h4 class="text-sm font-bold truncate text-white">${vid.title}</h4>
+                </div>
+                <button class="bg-brand-neon text-black px-3 py-1 rounded text-xs font-bold">${t('add_button')}</button>
+            `;
+            el.addEventListener('click', () => {
+                addToHostQueue(vid);
+                // Explicitly hide clear buttons
+                clearSearchBtn.classList.add('hidden');
+                clearSearchBtnTop.classList.add('hidden');
+
+                inputEl.value = '';
+                container.innerHTML = ''; // Fix: Clear previous results
+                container.classList.add('hidden');
+                searchOverlay.classList.add('hidden');
+                hostSearchResultsTop.classList.add('hidden'); // Ensure top results close too
+            });
+            container.appendChild(el);
+        });
+    } catch (e) { console.error(e); }
+}
+
+async function addToHostQueue(video) {
+    if (!roomId || !currentUser) {
+        console.error("Missing Room ID or User", { roomId, currentUser });
+        toast.show(t('login_required'), { isError: true });
+        return;
+    }
+
+    try {
+        // Fetch video details including duration
+        let duration = 0;
+        try {
+            const detailRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${video.id}&key=${YOUTUBE_API_KEY}`);
+            const detailData = await detailRes.json();
+            if (detailData.items && detailData.items[0]) {
+                const isoDuration = detailData.items[0].contentDetails.duration;
+                // Parse ISO 8601 duration (PT#H#M#S)
+                const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+                if (match) {
+                    const hours = parseInt(match[1] || 0);
+                    const mins = parseInt(match[2] || 0);
+                    const secs = parseInt(match[3] || 0);
+                    duration = hours * 3600 + mins * 60 + secs;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch video duration', e);
+        }
+
+        const queueRef = ref(db, `rooms/${roomId}/queue`);
+        const newRef = await push(queueRef, {
+            videoId: video.id,
+            title: video.title,
+            artist: video.artist || 'Unknown',
+            thumbnail: video.thumb,
+            requester: 'Host',
+            requesterId: currentUser.uid,
+            duration: duration,
+            createdAt: serverTimestamp(),
+            order: Date.now(),
+        });
+
+        const snap = await get(ref(db, `rooms/${roomId}/current_playback`));
+        if (!snap.exists() || !snap.val().videoId || snap.val().status === 'idle') {
+            playSong({ key: newRef.key, ...video, requester: 'Host', requesterId: currentUser.uid });
+        } else {
+            // Show success toast
+            toast.show(t('added_to_queue'));
+        }
+    } catch (e) {
+        console.error("Add to Host Queue Failed:", e);
+        toast.show(t('failed_add'), { isError: true });
+    }
+}
