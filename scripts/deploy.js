@@ -39,7 +39,7 @@ try {
 
     // 6. Update Version in Firebase Database
     console.log('Syncing new version to Firebase Database...');
-    const dbCommand = `firebase database:set /app_settings/version '"${newVersion}"' -f`;
+    const dbCommand = `firebase database:set /app_settings/version '"${newVersion}"' -f --instance ejtune-default-rtdb`;
     execSync(dbCommand, { stdio: 'inherit' });
 
     // 7. Git Tag & Push
