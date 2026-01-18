@@ -31,9 +31,8 @@ jobs:
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          target: ejtunes
-          channelId: ${{ github.ref == 'refs/heads/master' && 'live' || 'dev' }}
-          expires: 7d
+          target: ${{ github.ref == 'refs/heads/master' && 'ejtunes' || 'ejtunes-dev' }}
+          channelId: live
           projectId: ejtunes-music
 
       - name: Sync version to Firebase Database
