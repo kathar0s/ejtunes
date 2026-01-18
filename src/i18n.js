@@ -64,7 +64,13 @@ const resources = {
         delete: "Delete",
         update_available: "New Version Available",
         update_desc: "Version {version} has been released. Please refresh to update.",
-        refresh: "Refresh"
+        refresh: "Refresh",
+        error_oops: "Wait, we can't find that room!",
+        error_desc_participant: "We couldn't find a room for that code. If it was just created, try refreshing this page in a few seconds!",
+        error_desc_host: "This host session seems to be gone. You can try refreshing to check again, or just head back to create a new one.",
+        back_to_home: "Back to Home",
+        host_not_found_title: "Host Not Found",
+        waiting_reconnect: "Waiting for reconnection..."
     },
     ko: {
         app_title: "EJTunes",
@@ -130,7 +136,13 @@ const resources = {
         delete: "삭제",
         update_available: "새로운 버전 사용 가능",
         update_desc: "새로운 버전 {version}이(가) 출시되었습니다. 업데이트를 위해 새로고침해 주세요.",
-        refresh: "새로고침"
+        refresh: "새로고침",
+        error_oops: "앗, 방을 찾을 수 없어요!",
+        error_desc_participant: "입력하신 코드에 해당하는 방을 찾을 수 없습니다.<br/>방이 방금 만들어졌다면 잠시 후 새로고침 해보세요!",
+        error_desc_host: "이 방은 존재하지 않습니다.<br/>메인 화면으로 돌아가서 새 방을 만들어주세요.",
+        back_to_home: "메인 화면으로",
+        host_not_found_title: "호스트를 찾을 수 없습니다",
+        waiting_reconnect: "재연결 대기 중..."
     }
 };
 
@@ -178,12 +190,8 @@ export function updatePageText() {
         if (el.tagName === 'INPUT' && el.getAttribute('placeholder')) {
             el.placeholder = t(key);
         } else {
-            // For HTML content (like pro_tip_desc)
-            if (resources[currentLang][key] && resources[currentLang][key].includes('<')) {
-                el.innerHTML = t(key);
-            } else {
-                el.textContent = t(key);
-            }
+            // Always use innerHTML to support user formatting like <br/>
+            el.innerHTML = t(key);
         }
     });
 }

@@ -18,6 +18,7 @@ let sharedControlState = false; // Global state for permission checks
 let currentVideoId = null; // Track current video for listener cleanup
 let sortableInstance = null; // Sortable instance for queue reordering
 let isDragging = false; // Drag lock flag
+let isHostMissing = false; // Track host connection state globally
 
 const YOUTUBE_API_KEY = 'AIzaSyBuN6OIAjU8C2q37vIhIZkY_l8hg3R_z9g';
 const INVIDIOUS_INSTANCES = [
@@ -28,7 +29,7 @@ const INVIDIOUS_INSTANCES = [
 
 // Elements
 const loadingScreen = document.getElementById('loading-screen');
-const loginScreen = document.getElementById('login-screen');
+
 const roomSelectScreen = document.getElementById('room-select-screen');
 const appScreen = document.getElementById('app-screen');
 const appUserAvatar = document.getElementById('app-user-avatar');
@@ -75,9 +76,7 @@ if (window.location.pathname.startsWith('/host')) {
     // Prevent execution on host page
 }
 
-document.getElementById('login-btn').addEventListener('click', () => {
-    signInWithPopup(auth, provider).catch(console.error);
-});
+
 
 // Settings & Logout
 // --- Helper Functions ---
@@ -190,36 +189,12 @@ langOptions.forEach(opt => {
     }
 });
 
-// Login Screen Language Selector
-const loginLangOptions = document.querySelectorAll('.login-lang-option');
-const updateLoginLangUI = () => {
-    const currentLang = document.documentElement.lang || 'en';
-    loginLangOptions.forEach(opt => {
-        if (opt.dataset.lang === currentLang) {
-            opt.classList.remove('opacity-50');
-            opt.classList.add('opacity-100');
-        } else {
-            opt.classList.add('opacity-50');
-            opt.classList.remove('opacity-100');
-        }
-    });
-};
 
-loginLangOptions.forEach(opt => {
-    opt.addEventListener('click', () => {
-        setLanguage(opt.dataset.lang);
-        updateLoginLangUI();
-    });
-});
-
-// Initialize login language UI on load
-updateLoginLangUI();
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
-        loginScreen.classList.remove('legacy-flex-center');
-        loginScreen.classList.add('hidden');
+
 
         // Update generic avatars
         document.getElementById('user-avatar').src = user.photoURL || '';
@@ -239,7 +214,14 @@ onAuthStateChanged(auth, (user) => {
         const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
 
         if (targetRoom) joinRoom(targetRoom);
-        else showRoomSelect();
+        else {
+            const redirectParams = new URLSearchParams(window.location.search);
+            if (redirectParams.get('redirect') === 'host') {
+                window.location.href = '/host';
+                return;
+            }
+            showRoomSelect();
+        }
 
         // Update text after login success
         updatePageText();
@@ -250,28 +232,12 @@ onAuthStateChanged(auth, (user) => {
             langSelectApp.value = document.documentElement.lang || 'en';
         }
 
-        // Hide loading screen LAST for smoother transition
-        setTimeout(() => {
-            loadingScreen.classList.remove('legacy-flex-center');
-            loadingScreen.classList.add('hidden');
-        }, 100);
+
 
     } else {
-        // Hide others first
-        roomSelectScreen.classList.remove('legacy-flex-center');
-        roomSelectScreen.classList.add('hidden');
-        appScreen.classList.add('hidden');
-
-        // Show login
-        loginScreen.classList.add('legacy-flex-center');
-        loginScreen.classList.remove('hidden');
-
-        // Hide loading screen
-        loadingScreen.classList.remove('legacy-flex-center');
-        loadingScreen.classList.add('hidden');
-
-        if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/host')) {
-            window.history.pushState({}, '', '/');
+        // Not logged in: Redirect to login
+        if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login?redirect=participant';
         }
     }
 });
@@ -279,13 +245,26 @@ onAuthStateChanged(auth, (user) => {
 function showRoomSelect() {
     roomSelectScreen.classList.add('legacy-flex-center');
     roomSelectScreen.classList.remove('hidden');
-    loginScreen.classList.remove('legacy-flex-center');
-    loginScreen.classList.add('hidden');
+    roomSelectScreen.style.display = 'flex';
     appScreen.classList.add('hidden');
+    const errorScreen = document.getElementById('error-screen');
+    if (errorScreen) errorScreen.classList.add('hidden');
+
+    // Hide loading screen
+    loadingScreen.classList.remove('legacy-flex-center');
+    loadingScreen.classList.add('hidden');
+
     updatePageText(); // Ensure text is updated
     updateFlagIcon(document.documentElement.lang);
     loadActiveRooms();
 }
+
+document.getElementById('error-back-btn').addEventListener('click', () => {
+    window.location.href = '/';
+});
+
+
+
 function loadActiveRooms() {
     const roomsRef = ref(db, 'rooms');
     onValue(roomsRef, (snapshot) => {
@@ -353,9 +332,24 @@ async function joinRoom(roomId) {
     const snapshot = await get(roomRef);
 
     if (!snapshot.exists()) {
-        alert(t('room_not_found'));
-        window.history.pushState({}, '', '/');
-        showRoomSelect();
+        const errorScreen = document.getElementById('error-screen');
+        if (errorScreen) {
+            errorScreen.classList.remove('hidden');
+            errorScreen.classList.add('legacy-flex-center');
+
+            // Sync toggle state with current theme
+            const themeToggle = document.getElementById('error-theme-toggle');
+            if (themeToggle) {
+                // Determine initial theme (system or current class)
+                const isDark = document.documentElement.classList.contains('dark') ||
+                    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (isDark) document.documentElement.classList.add('dark');
+                themeToggle.checked = isDark;
+            }
+        }
+        loadingScreen.classList.add('hidden');
+        loadingScreen.classList.remove('legacy-flex-center');
+        // URL is preserved for refresh retry
         return;
     }
 
@@ -371,8 +365,11 @@ async function joinRoom(roomId) {
 
     window.history.pushState({}, '', `/${roomId}`);
 
+    loadingScreen.classList.add('hidden');
+    loadingScreen.classList.remove('legacy-flex-center');
     roomSelectScreen.classList.remove('legacy-flex-center');
     roomSelectScreen.classList.add('hidden');
+    roomSelectScreen.style.display = 'none';
     appScreen.classList.remove('hidden');
 
     document.getElementById('current-room-name').textContent = info.name || 'Room';
@@ -474,36 +471,74 @@ function initRoomListeners() {
     // Multi-Host Support: Monitor active sessions with grace period for reconnection
     const sessionsRef = ref(db, `rooms/${currentRoomId}/host_sessions`);
     let disconnectTimeout = null;
-    const GRACE_PERIOD_MS = 5000; // 5 seconds grace period for host reconnection
+    isHostMissing = false; // Reset on init
+    const GRACE_PERIOD_MS = 0; // 0 seconds grace period for host reconnection
+
+    const connectionIndicator = document.getElementById('connection-indicator');
+    const appScreenBlock = document.getElementById('app-screen'); // Access main wrapper to blur content
+    // We want to blur everything EXCEPT the header potentially, or just blur the body.
+    // Let's create a specific blur target efficiently.
+    // Actually, blurring the whole app-screen is fine if we show a toast.
+    // Or just blur `playlist-container` and `controls`.
+
+    const hostMissingOverlay = document.getElementById('host-missing-overlay');
+    const playbackSection = document.getElementById('remote-playback-section');
 
     onValue(sessionsRef, (snapshot) => {
         // Connected if sessions exist
         const hasSessions = snapshot.exists() && snapshot.size > 0;
 
         if (hasSessions) {
-            // Host is connected - clear any pending disconnect timeout
+            // Connected
             if (disconnectTimeout) {
                 clearTimeout(disconnectTimeout);
                 disconnectTimeout = null;
-                console.log('[Remote] Host session detected, cancelled disconnect timer');
             }
-        } else {
-            // No sessions detected - start grace period before showing disconnect modal
-            console.log('[Remote] No host sessions, starting grace period...');
+            if (connectionIndicator) {
+                connectionIndicator.classList.remove('bg-red-500');
+                connectionIndicator.classList.add('bg-green-500', 'animate-pulse');
+            }
+            // Remove Blur & Overlay on playback section only
+            playbackSection?.classList.remove('blur-sm', 'opacity-50', 'pointer-events-none');
+            hostMissingOverlay?.classList.add('hidden');
+            isHostMissing = false;
 
+        } else {
+            // Disconnected
             if (!disconnectTimeout) {
                 disconnectTimeout = setTimeout(() => {
-                    // Re-check after grace period
-                    get(sessionsRef).then(recheck => {
-                        if (!recheck.exists() || recheck.size === 0) {
-                            // Still no sessions after grace period - host truly disconnected
-                            console.log('[Remote] Host disconnected after grace period');
-                            off(sessionsRef);
-                            off(ref(db, `rooms/${currentRoomId}/current_playback`));
-                            off(ref(db, `rooms/${currentRoomId}/queue`));
-                            document.getElementById('host-disconnected-modal').classList.remove('hidden');
-                        } else {
-                            console.log('[Remote] Host reconnected during grace period');
+                    // Double check if still disconnected
+                    get(ref(db, `rooms/${currentRoomId}/host_sessions`)).then(snapshot => {
+                        if (!snapshot.exists()) {
+                            // TRULY DISCONNECTED
+                            connectionIndicator.classList.remove('bg-green-500', 'animate-pulse');
+                            connectionIndicator.classList.add('bg-red-500');
+
+                            // Check if room still exists (Deleted vs Disconnected)
+                            get(ref(db, `rooms/${currentRoomId}`)).then(roomSnap => {
+                                if (!roomSnap.exists()) {
+                                    // Room DELETED
+                                    document.getElementById('host-disconnected-modal').classList.remove('hidden');
+                                } else {
+                                    // Room Exists, Host Temporarily Gone -> Deactivate PLAYBACK area
+                                    // Use backdrop-blur on the overlay itself in HTML so text stays sharp
+                                    playbackSection?.classList.add('pointer-events-none');
+                                    hostMissingOverlay?.classList.remove('hidden');
+                                    isHostMissing = true;
+
+                                    // IMPROVEMENT: Pause the state in DB to avoid time jump
+                                    if (currentSongData && currentSongData.status === 'playing' && currentSongData.startedAt) {
+                                        const elapsedSec = (Date.now() - currentSongData.startedAt) / 1000;
+                                        stopRemoteProgressTimer();
+                                        update(ref(db, `rooms/${currentRoomId}/current_playback`), {
+                                            status: 'paused',
+                                            startedAt: null,
+                                            currentTime: elapsedSec,
+                                            interrupted: true // Mark as interruption for auto-resume
+                                        });
+                                    }
+                                }
+                            });
                         }
                         disconnectTimeout = null;
                     });
@@ -881,8 +916,14 @@ function setRemoteProgressBar(data) {
     if (remoteTotalTime) remoteTotalTime.textContent = formatTime(duration);
 
     // Calculate and show current position immediately (for both playing and paused)
-    if (data.startedAt && !isRemoteScrubbing) {
-        const elapsed = Math.floor((Date.now() - data.startedAt) / 1000);
+    if (!isRemoteScrubbing) {
+        let elapsed = 0;
+        if (data.startedAt) {
+            elapsed = Math.floor((Date.now() - data.startedAt) / 1000);
+        } else if (data.currentTime !== undefined) {
+            elapsed = Math.floor(data.currentTime);
+        }
+
         const clampedElapsed = Math.min(elapsed, duration);
         const percent = Math.min((clampedElapsed / duration) * 100, 100);
         if (remoteProgressFill) remoteProgressFill.style.width = `${percent}%`;
@@ -962,9 +1003,16 @@ if (remoteProgressContainer) {
         const seekTime = Math.floor(percent * currentSongData.duration);
 
         // Update startedAt to sync all hosts
-        await update(ref(db, `rooms/${currentRoomId}/current_playback`), {
-            startedAt: Date.now() - (seekTime * 1000)
-        });
+        if (currentSongData.status === 'paused') {
+            await update(ref(db, `rooms/${currentRoomId}/current_playback`), {
+                currentTime: seekTime,
+                startedAt: null
+            });
+        } else {
+            await update(ref(db, `rooms/${currentRoomId}/current_playback`), {
+                startedAt: Date.now() - (seekTime * 1000)
+            });
+        }
 
         // Restore transitions
         setTimeout(() => {
@@ -1130,10 +1178,18 @@ function renderQueue() {
             document.addEventListener('mouseup', onMouseUp);
         });
 
-        // Double click
-        el.addEventListener('dblclick', () => {
-            if (canControlRoom()) {
-                playSongByKey(song.key);
+        // Double click / Double tap to play
+        let lastClickTime = 0;
+        el.addEventListener('click', () => {
+            const currentTime = Date.now();
+            const timeDiff = currentTime - lastClickTime;
+            if (timeDiff < 300 && timeDiff > 0) {
+                if (canControlRoom() && !isHostMissing) {
+                    playSongByKey(song.key);
+                }
+                lastClickTime = 0;
+            } else {
+                lastClickTime = currentTime;
             }
         });
 
@@ -1510,7 +1566,7 @@ async function addToQueue(video) {
 // Play song by queue key (for double-click to play)
 // Send command to host to play the song
 const playSongByKey = async (key) => {
-    if (!currentRoomId || !canControlRoom()) return;
+    if (!currentRoomId || !canControlRoom() || isHostMissing) return;
 
     // Send playByKey command to host (same pattern as next/previous)
     await set(ref(db, `rooms/${currentRoomId}/commands`), {
@@ -1536,7 +1592,7 @@ const updateLastController = () => {
 
 // Helper to send commands to the host
 function sendCommand(action) {
-    if (!currentRoomId) return;
+    if (!currentRoomId || isHostMissing) return;
     update(ref(db, `rooms/${currentRoomId}/commands`), { action: action, timestamp: serverTimestamp() });
     updateLastController();
 }
@@ -1691,3 +1747,30 @@ function showUpdateBanner(newVersion) {
 
 // Call version check on init
 checkVersion();
+
+// Error Page Theme Toggle Initialization
+(function initErrorThemeToggle() {
+    // Detect system theme and apply initially if not already set by logic
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark && !document.documentElement.classList.contains('light')) {
+        document.documentElement.classList.add('dark');
+    }
+
+    const toggle = document.getElementById('error-theme-toggle');
+    if (toggle) {
+        // Initial sync
+        toggle.checked = document.documentElement.classList.contains('dark');
+
+        toggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.documentElement.classList.add('dark');
+                document.documentElement.classList.remove('light');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light'); // Explicit label for manual light mode
+            }
+        });
+    }
+})();
+
+

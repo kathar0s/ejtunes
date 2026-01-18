@@ -17,6 +17,10 @@
                     "destination": "/host/index.html"
                 },
                 {
+                    "source": "/login/**",
+                    "destination": "/login/index.html"
+                },
+                {
                     "source": "**",
                     "destination": "/index.html"
                 }
@@ -34,6 +38,10 @@
                 {
                     "source": "/host/**",
                     "destination": "/host/index.html"
+                },
+                {
+                    "source": "/login/**",
+                    "destination": "/login/index.html"
                 },
                 {
                     "source": "**",

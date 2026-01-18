@@ -1,8 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+    darkMode: 'class',
     content: [
         "./index.html",
         "./host/index.html",
+        "./login/index.html",
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
@@ -25,6 +27,10 @@ export default {
             },
             animation: {
                 'spin-slow': 'spin 8s linear infinite',
+            },
+            backgroundImage: {
+                'login-day': "url('/bg_light.jpeg')",
+                'login-night': "url('/bg_night.jpeg')",
             },
         },
     },

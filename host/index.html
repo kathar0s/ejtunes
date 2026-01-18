@@ -30,31 +30,16 @@
     style="height: 100%; width: 100%; margin: 0; padding: 0;">
 
     <!-- Immediate UI State Control -->
-    <script>
-        (function () {
-            const path = window.location.pathname;
-            // Simplistic check: if path ends with /host or /host/ (ignoring query), show setup.
-            // If it has a subpath (e.g. /host/XYZ), keep hidden.
-            // We use a regex or split to be safe.
-            const segments = path.split('/').filter(s => s.length > 0);
-            const isRootHost = segments.length > 0 && segments[segments.length - 1] === 'host';
 
-            // If we are deep linking (/host/CODE), we want Setup hidden (default now).
-            // If we are just at /host, we want Setup shown immediately.
 
-            document.addEventListener('DOMContentLoaded', () => {
-                const setup = document.getElementById('setup-screen');
-                if (isRootHost && setup) {
-                    setup.classList.remove('hidden');
-                    setup.style.removeProperty('display');
-                }
-            });
-        })();
-    </script>
+    <!-- Loading Screen (Consistency with Participant) -->
+    <div id="loading-screen"
+        class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
+        <div class="w-12 h-12 border-4 border-brand-mint border-t-transparent rounded-full animate-spin"></div>
+    </div>
 
-    <!-- Setup Screen (Hidden by default to prevent FOUC on restore) -->
-    <div id="setup-screen" class="hidden legacy-flex-center absolute inset-0 z-50 bg-black p-8 w-full h-full"
-        style="display: none;">
+    <!-- Setup Screen (STRICTLY Hidden by default to prevent FOUC) -->
+    <div id="setup-screen" class="hidden absolute inset-0 z-50 bg-black p-8 w-full h-full" style="display: none;">
         <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain">
         <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTunes</h1>
         <p class="text-gray-400 mb-8" data-i18n="create_room_desc">Create a room to start hosting</p>
@@ -65,6 +50,7 @@
                 class="w-full bg-brand-gray border border-white/20 focus:border-brand-mint rounded-xl py-3 px-4 text-center text-lg outline-none transition">
 
             <div id="room-name-error" class="hidden text-red-500 text-sm font-bold mt-2"></div>
+            <div id="room-invalid-error" class="hidden text-red-500 text-sm font-bold mt-2 text-center"></div>
 
             <button id="create-room-btn"
                 class="w-full bg-brand-mint text-black py-3 rounded-xl font-bold text-lg hover:bg-brand-mint/80 transition"
@@ -100,6 +86,51 @@
             🌐 <span id="current-lang-setup">English</span>
         </button>
     </div>
+
+    <!-- Error Screen (Room Not Found) -->
+    <div id="error-screen" class="hidden fixed inset-0 z-[60] text-white flex flex-col items-center justify-center p-6">
+
+        <!-- Background Layers for smooth transition -->
+        <div class="absolute inset-0 bg-login-day bg-cover bg-center bg-no-repeat transition-opacity duration-1000 z-0">
+        </div>
+        <div id="error-bg-night"
+            class="absolute inset-0 bg-login-night bg-cover bg-center bg-no-repeat opacity-0 dark:opacity-100 transition-opacity duration-1000 z-[1]">
+        </div>
+
+        <!-- Semi-transparent Overlay -->
+        <div
+            class="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] transition-all duration-1000 z-[2]">
+        </div>
+
+
+        <!-- Theme Toggle Switch -->
+        <div
+            class="absolute top-6 right-6 z-30 flex items-center gap-3 bg-black/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <span class="text-xs font-bold text-white/50 dark:text-gray-400">DAY</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="error-theme-toggle" class="sr-only peer">
+                <div class="w-12 h-6 bg-gray-400/30 rounded-full peer peer-checked:bg-white transition-all duration-300
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                    peer-checked:after:translate-x-6 peer-checked:after:bg-black"></div>
+            </label>
+            <span class="text-xs font-bold text-white/50 dark:text-gray-400 text-brand-mint">NIGHT</span>
+        </div>
+
+        <div class="relative z-10 flex flex-col items-center text-center max-w-2xl animate-fade-in">
+            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight leading-none text-white drop-shadow-lg"
+                data-i18n="error_oops">OOPS!</h1>
+
+            <p class="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed font-medium drop-shadow-md max-w-2xl"
+                data-i18n="error_desc_host">
+                It seems this host session has vanished into thin air. Time to head back and setup a new one!
+            </p>
+
+            <button id="error-back-btn"
+                class="px-10 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-brand-mint hover:scale-105 transition-all shadow-xl shadow-black/20 active:scale-95"
+                data-i18n="back_to_home">BACK TO HOME</button>
+        </div>
+    </div>
+
 
     <!-- Main Player Screen -->
     <div id="player-screen" class="hidden h-full flex flex-col relative">
@@ -508,7 +539,7 @@
                                 class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none"
                                 style="left: 0%"></div>
                         </div>
-                        <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <div class="flex justify-between text-xs text-gray-100 mt-2">
                             <span id="prog-current">0:00</span>
                             <span id="prog-duration">--:--</span>
                         </div>

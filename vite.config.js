@@ -7,11 +7,18 @@ export default defineConfig({
       name: 'rewrite-middleware',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url === '/host') {
-            req.url = '/host/';
-          } else if (req.url.startsWith('/host/') && !req.url.includes('.')) {
+          const url = new URL(req.url, 'http://localhost');
+          const pathname = url.pathname;
+
+          if (pathname === '/host') {
+            req.url = '/host/' + url.search;
+          } else if (pathname.startsWith('/host/') && !pathname.includes('.')) {
             // Rewrite /host/XYZ to /host/index.html
-            req.url = '/host/index.html';
+            req.url = '/host/index.html' + url.search;
+          } else if (pathname === '/login') {
+            req.url = '/login/index.html' + url.search;
+          } else if (pathname.startsWith('/login/') && !pathname.includes('.')) {
+            req.url = '/login/index.html' + url.search;
           }
           next();
         });
@@ -23,6 +30,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         host: resolve(__dirname, 'host/index.html'),
+        login: resolve(__dirname, 'login/index.html'),
       },
     },
     target: 'es2015',

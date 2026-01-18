@@ -63,34 +63,58 @@
         class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
         <div class="w-12 h-12 border-4 border-brand-mint border-t-transparent rounded-full animate-spin"></div>
     </div>
+    <!-- Error Screen (Room Not Found) -->
+    <div id="error-screen" class="hidden fixed inset-0 z-[60] text-white flex flex-col items-center justify-center p-6">
 
-    <!-- Login Screen -->
-    <div id="login-screen"
-        class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full">
-        <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain">
-        <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTunes</h1>
-        <p class="text-gray-400 mb-8" data-i18n="join_room">Collaborative music for your workspace</p>
-        <button id="login-btn"
-            class="bg-white text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition">
-            <svg class="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="currentColor"
-                    d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
-            </svg>
-            <span data-i18n="sign_in_google">Sign in with Google</span>
-        </button>
+        <!-- Background Layers for smooth transition -->
+        <div class="absolute inset-0 bg-login-day bg-cover bg-center bg-no-repeat transition-opacity duration-1000 z-0">
+        </div>
+        <div id="error-bg-night"
+            class="absolute inset-0 bg-login-night bg-cover bg-center bg-no-repeat opacity-0 dark:opacity-100 transition-opacity duration-1000 z-[1]">
+        </div>
 
-        <!-- Language Selector -->
-        <div class="flex items-center gap-4 mt-6">
-            <button class="login-lang-option text-2xl hover:scale-110 transition opacity-50 hover:opacity-100"
-                data-lang="en">🇺🇸</button>
-            <button class="login-lang-option text-2xl hover:scale-110 transition opacity-50 hover:opacity-100"
-                data-lang="ko">🇰🇷</button>
+        <!-- Semi-transparent Overlay -->
+        <div
+            class="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] transition-all duration-1000 z-[2]">
+        </div>
+
+
+        <!-- Theme Toggle Switch -->
+        <div
+            class="absolute top-6 right-6 z-30 flex items-center gap-3 bg-black/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <span class="text-xs font-bold text-white/50 dark:text-gray-400">DAY</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="error-theme-toggle" class="sr-only peer">
+                <div class="w-12 h-6 bg-gray-400/30 rounded-full peer peer-checked:bg-white transition-all duration-300
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                    peer-checked:after:translate-x-6 peer-checked:after:bg-black"></div>
+            </label>
+            <span class="text-xs font-bold text-white/50 dark:text-gray-400 text-brand-mint">NIGHT</span>
+        </div>
+
+        <div class="relative z-10 flex flex-col items-center text-center max-w-2xl animate-fade-in">
+            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight leading-none text-white drop-shadow-lg"
+                data-i18n="error_oops">OOPS!</h1>
+
+            <p class="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed font-medium drop-shadow-md max-w-2xl"
+                data-i18n="error_desc_participant">
+                You must have picked the wrong door because I haven't been able to lay my eye on the page you've been
+                searching for.
+            </p>
+
+            <button id="error-back-btn"
+                class="px-10 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-brand-mint hover:scale-105 transition-all shadow-xl shadow-black/20 active:scale-95"
+                data-i18n="back_to_home">BACK TO HOME</button>
         </div>
     </div>
 
-    <!-- Room Select Screen -->
-    <div id="room-select-screen"
-        class="hidden fixed inset-0 z-40 bg-black flex flex-col p-4 sm:p-6 w-full h-full legacy-flex-center">
+
+    <!-- Login Screen -->
+
+
+    <!-- Room Select Screen (STRICTLY Hidden by default to prevent flickering) -->
+    <div id="room-select-screen" class="hidden fixed inset-0 z-40 bg-black flex flex-col p-4 sm:p-6 w-full h-full"
+        style="display: none;">
         <!-- Layout Wrapper -->
         <div class="w-full max-w-lg flex flex-col h-full">
             <header class="flex items-center justify-between mb-6 shrink-0">
@@ -164,8 +188,8 @@
     </div>
 
     <!-- App Screen -->
-    <div id="app-screen" class="hidden h-screen flex flex-col">
-        <header class="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-white/10">
+    <div id="app-screen" class="hidden h-screen flex flex-col relative">
+        <header class="sticky top-0 z-[200] bg-black/95 backdrop-blur-md border-b border-white/10">
             <div class="relative px-4">
                 <!-- Main Header Row -->
                 <div class="flex items-center justify-between gap-1">
@@ -190,7 +214,7 @@
 
                             <!-- Combined Profile & Language Popover -->
                             <div id="profile-popover-app"
-                                class="hidden absolute top-14 left-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-left transition-all animate-fade-in-up">
+                                class="hidden absolute top-14 left-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[150] p-4 transform origin-top-left transition-all animate-fade-in-up">
                                 <div class="flex flex-col items-center mb-4">
                                     <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-mint mb-2">
                                         <img id="popover-avatar-app" src="" class="w-full h-full object-cover">
@@ -235,7 +259,11 @@
                             <button id="room-info-btn"
                                 class="w-fit max-w-full text-left rounded-lg px-2 -ml-2 py-1 transition group">
                                 <h1 id="current-room-name" class="font-bold truncate text-lg transition">Room</h1>
-                                <p id="current-room-code" class="text-xs text-brand-mint font-mono"></p>
+                                <div class="flex items-center gap-1">
+                                    <span id="connection-indicator"
+                                        class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <p id="current-room-code" class="text-xs text-brand-mint font-mono"></p>
+                                </div>
                             </button>
 
                             <!-- Room Info Popover -->
@@ -311,12 +339,21 @@
             </div>
 
             <div id="search-results"
-                class="hidden absolute left-0 right-0 top-full bg-brand-gray border-t border-white/10 max-h-[50vh] overflow-y-auto shadow-2xl z-20">
+                class="hidden absolute left-0 right-0 top-full bg-brand-gray border-t border-white/10 max-h-[50vh] overflow-y-auto shadow-2xl z-[160]">
             </div>
         </header>
 
-        <main class="p-4 flex-1 flex flex-col space-y-6 overflow-hidden">
-            <section class="bg-gradient-to-br from-brand-gray to-gray-900 rounded-2xl p-4 border border-white/5">
+        <main id="app-main" class="p-4 flex-1 flex flex-col space-y-6 overflow-hidden">
+            <section id="remote-playback-section"
+                class="relative bg-gradient-to-br from-brand-gray to-gray-900 rounded-2xl p-4 border border-white/5">
+                <!-- Host Missing Overlay (Subtle, covers only playback area) -->
+                <div id="host-missing-overlay"
+                    class="hidden absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-300 rounded-2xl">
+                    <h3 class="text-xl font-bold mb-1 text-white text-center drop-shadow-lg"
+                        data-i18n="host_not_found_title">Host Not Found</h3>
+                    <p class="text-gray-300 text-xs text-center font-medium drop-shadow-md"
+                        data-i18n="waiting_reconnect">Waiting for reconnection...</p>
+                </div>
                 <div class="flex gap-4 items-center">
                     <div
                         class="w-20 h-20 bg-black rounded-lg shadow-lg overflow-hidden relative flex-shrink-0 flex items-center justify-center">
@@ -358,7 +395,7 @@
                                 style="left: 0%;"></div>
                         </div>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-500 mt-1 select-none">
+                    <div class="flex justify-between text-xs text-gray-100 mt-1 select-none">
                         <span id="remote-current-time">0:00</span>
                         <span id="remote-total-time">0:00</span>
                     </div>
@@ -452,6 +489,8 @@
         </main>
 
         <!-- Old Settings Overlay Removed -->
+
+        <!-- Host Missing Overlay Removed from here -->
     </div>
 
     <!-- Global Popovers (Accessible from any screen) -->
