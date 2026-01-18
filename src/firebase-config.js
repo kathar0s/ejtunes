@@ -6,14 +6,14 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // TODO: Replace with your actual Firebase project configuration
 // Firebase Console > Project Settings > General > Your apps > SDK setup
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "ejtune.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://ejtune-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "ejtune",
-  storageBucket: "ejtune.firebasestorage.app",
-  messagingSenderId: "663588705370",
-  appId: "1:663588705370:web:0690d6ba98cf618aec3463",
-  measurementId: ""
+  apiKey: "AIzaSyB6s99bMqtxUGHjxnOqA_qpvrMjaejEcbM",
+  authDomain: "ejtunes.web.app",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://ejtunes-music-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ejtunes-music",
+  storageBucket: "ejtunes-music.firebasestorage.app",
+  messagingSenderId: "797159646057",
+  appId: "1:797159646057:web:2fd8f79e11955d64fed3f8",
+  measurementId: "G-ER4Y5PTNXS"
 };
 
 // Initialize Firebase
@@ -22,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 // Realtime Database (NOT Firestore)
 export const db = getDatabase(app);
 
-if (firebaseConfig.databaseURL.includes('ejtune-default-rtdb')) {
+if (firebaseConfig.databaseURL.includes('ejtunes-music-default-rtdb')) {
   console.warn('%c⚠️ WARNING: Connected to PRODUCTION Database!', 'background: red; color: white; font-size: 16px; padding: 4px; font-weight: bold;');
 } else {
   console.log('%c✅ Connected to DEVELOPMENT Database', 'background: green; color: white; padding: 4px;');

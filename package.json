@@ -1,11 +1,11 @@
 {
-  "name": "ejtune",
+  "name": "ejtunes",
   "private": true,
   "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:prod": "VITE_FIREBASE_DATABASE_URL=https://ejtune-default-rtdb.asia-southeast1.firebasedatabase.app vite",
+    "dev:prod": "VITE_FIREBASE_DATABASE_URL=https://ejtunes-music-default-rtdb.asia-southeast1.firebasedatabase.app vite",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "node scripts/deploy.js"

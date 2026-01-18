@@ -1,7 +1,7 @@
 // Language Dictionary
 const resources = {
     en: {
-        app_title: "EJTune",
+        app_title: "EJTunes",
         create_room: "Create Room",
         create_room_desc: "Create a room to start hosting",
         join_room: "Join Room",
@@ -67,7 +67,7 @@ const resources = {
         refresh: "Refresh"
     },
     ko: {
-        app_title: "EJTune",
+        app_title: "EJTunes",
         create_room: "방 만들기",
         create_room_desc: "방을 만들고 다른사람과 함께 음악을 즐기세요!",
         join_room: "방 입장하기",

@@ -12,7 +12,7 @@ async function syncVersion() {
 
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            databaseURL: "https://ejtune-default-rtdb.asia-southeast1.firebasedatabase.app"
+            databaseURL: "https://ejtunes-music-default-rtdb.asia-southeast1.firebasedatabase.app"
         });
 
         const db = admin.database();
