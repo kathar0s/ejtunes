@@ -301,7 +301,13 @@ function renderActiveRooms() {
         const el = document.createElement('div');
         el.className = 'bg-brand-gray p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/10 transition border border-white/5';
         el.innerHTML = `
-                <div class="w-12 h-12 bg-brand-mint/20 rounded-full flex items-center justify-center text-2xl">🎵</div>
+                <div class="w-12 h-12 flex items-center justify-center text-white">
+                    <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 18V5l12-2v13"></path>
+                        <circle cx="6" cy="18" r="3"></circle>
+                        <circle cx="18" cy="16" r="3"></circle>
+                    </svg>
+                </div>
                 <div class="flex-1 min-w-0">
                     <h3 class="font-bold truncate">${info.name || 'Unnamed Room'}</h3>
                     <p class="text-sm text-gray-400">${info.creatorName || 'Unknown'}</p>
