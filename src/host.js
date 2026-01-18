@@ -8,6 +8,7 @@ import { initLanguage, setLanguage, t, updatePageText } from './i18n';
 import { toast, decodeHtmlEntities, getHighResThumbnail } from './utils';
 import Sortable from 'sortablejs';
 import QRCode from 'qrcode';
+import { APP_VERSION } from './version';
 
 // Global State
 let player;
@@ -2399,3 +2400,48 @@ async function addToHostQueue(video) {
         toast.show(t('failed_add'), { isError: true });
     }
 }
+// Version checking logic
+function checkVersion() {
+    const versionRef = ref(db, 'app_settings/version');
+    onValue(versionRef, (snapshot) => {
+        const latestVersion = snapshot.val();
+        if (latestVersion && isNewerVersion(latestVersion, APP_VERSION)) {
+            showUpdateBanner(latestVersion);
+        }
+    });
+}
+
+function isNewerVersion(latest, current) {
+    const latestParts = latest.split('.').map(Number);
+    const currentParts = current.split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+        if (latestParts[i] > currentParts[i]) return true;
+        if (latestParts[i] < currentParts[i]) return false;
+    }
+    return false;
+}
+
+function showUpdateBanner(newVersion) {
+    if (document.getElementById('update-notification-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'update-notification-banner';
+    banner.className = 'update-banner top';
+    banner.innerHTML = `
+        <div class="flex-1 text-sm text-gray-200">
+            <span class="font-bold text-brand-neon">${t('update_available')}</span> 
+            ${t('update_desc', { version: newVersion })}
+        </div>
+        <button id="refresh-app-btn" class="bg-brand-neon hover:bg-brand-neon/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
+            ${t('refresh')}
+        </button>
+    `;
+    document.body.appendChild(banner);
+
+    document.getElementById('refresh-app-btn').addEventListener('click', () => {
+        window.location.reload();
+    });
+}
+
+// Call version check on init
+checkVersion();

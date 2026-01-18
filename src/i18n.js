@@ -61,7 +61,10 @@ const resources = {
         private_room: "Private Room",
         private_room_hint: "Hidden from active room list",
         host_control_only: "Host Control Only",
-        delete: "Delete"
+        delete: "Delete",
+        update_available: "New Version Available",
+        update_desc: "Version {version} has been released. Please refresh to update.",
+        refresh: "Refresh"
     },
     ko: {
         app_title: "EJTune",
@@ -124,7 +127,10 @@ const resources = {
         private_room: "비공개 방",
         private_room_hint: "방 목록에 표시되지 않습니다",
         host_control_only: "제어 권한이 없습니다",
-        delete: "삭제"
+        delete: "삭제",
+        update_available: "새로운 버전 사용 가능",
+        update_desc: "새로운 버전 {version}이(가) 출시되었습니다. 업데이트를 위해 새로고침해 주세요.",
+        refresh: "새로고침"
     }
 };
 

@@ -4,6 +4,7 @@ import { ref, push, serverTimestamp, onValue, update, get, set, query, orderByCh
 import { initLanguage, setLanguage, t, updatePageText } from './i18n';
 import { decodeHtmlEntities, toast } from './utils';
 import Sortable from 'sortablejs';
+import { APP_VERSION } from './version';
 
 let currentUser = null;
 let currentRoomId = null;
@@ -1573,3 +1574,48 @@ if (volSlider) {
     volSlider.removeEventListener('input', remoteVolumeFn); // Prevent duplicates
     volSlider.addEventListener('input', remoteVolumeFn);
 }
+// Version checking logic
+function checkVersion() {
+    const versionRef = ref(db, 'app_settings/version');
+    onValue(versionRef, (snapshot) => {
+        const latestVersion = snapshot.val();
+        if (latestVersion && isNewerVersion(latestVersion, APP_VERSION)) {
+            showUpdateBanner(latestVersion);
+        }
+    });
+}
+
+function isNewerVersion(latest, current) {
+    const latestParts = latest.split('.').map(Number);
+    const currentParts = current.split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+        if (latestParts[i] > currentParts[i]) return true;
+        if (latestParts[i] < currentParts[i]) return false;
+    }
+    return false;
+}
+
+function showUpdateBanner(newVersion) {
+    if (document.getElementById('update-notification-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'update-notification-banner';
+    banner.className = 'update-banner bottom';
+    banner.innerHTML = `
+        <div class="flex-1 text-sm text-gray-200">
+            <span class="font-bold text-brand-neon">${t('update_available')}</span> 
+            <span class="text-xs opacity-70 block">${t('update_desc', { version: newVersion })}</span>
+        </div>
+        <button id="refresh-app-btn" class="bg-brand-neon hover:bg-brand-neon/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
+            ${t('refresh')}
+        </button>
+    `;
+    document.body.appendChild(banner);
+
+    document.getElementById('refresh-app-btn').addEventListener('click', () => {
+        window.location.reload();
+    });
+}
+
+// Call version check on init
+checkVersion();
