@@ -137,7 +137,7 @@ const resources = {
 let currentLang = 'en';
 
 export function initLanguage() {
-    const saved = localStorage.getItem('officedj_lang');
+    const saved = localStorage.getItem('ejtunes_lang');
     if (saved) {
         currentLang = saved;
     } else {
@@ -152,7 +152,7 @@ export function initLanguage() {
 export function setLanguage(lang) {
     if (resources[lang]) {
         currentLang = lang;
-        localStorage.setItem('officedj_lang', lang);
+        localStorage.setItem('ejtunes_lang', lang);
         document.documentElement.lang = lang;
         updatePageText();
         return true;

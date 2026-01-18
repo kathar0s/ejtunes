@@ -1,5 +1,5 @@
 /**
- * Shared Utilities for Office DJ
+ * Shared Utilities for EJTunes
  */
 
 /**
