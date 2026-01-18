@@ -2427,6 +2427,18 @@ function initRoomSettings() {
             });
         }
     }
+
+    // --- Shuffle ---
+    onValue(ref(db, `rooms/${roomId}/info/shuffle`), (snapshot) => {
+        isShuffle = snapshot.val() === true;
+        updateShuffleUI(isShuffle);
+    });
+
+    // --- Repeat Mode ---
+    onValue(ref(db, `rooms/${roomId}/info/repeatMode`), (snapshot) => {
+        repeatMode = snapshot.val() || 'all';
+        updateRepeatUI(repeatMode);
+    });
 }
 
 function updateToggleUI(toggleBtn, isOn) {
