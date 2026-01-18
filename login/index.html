@@ -33,7 +33,21 @@
     <div id="login-screen"
         class="fixed inset-0 z-50 bg-login-day dark:bg-login-night bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center transition-all duration-700">
         <!-- Overlay for better text readability -->
-        <div class="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px]"></div>
+        <div class="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] transition-all duration-700">
+        </div>
+
+        <!-- Theme Toggle Switch -->
+        <div
+            class="absolute top-6 right-6 z-30 flex items-center gap-3 bg-black/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <span class="text-[10px] font-bold text-white/50 dark:text-gray-400">DAY</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="login-theme-toggle" class="sr-only peer">
+                <div class="w-12 h-6 bg-gray-400/30 rounded-full peer peer-checked:bg-white transition-all duration-300
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                    peer-checked:after:translate-x-6 peer-checked:after:bg-black"></div>
+            </label>
+            <span class="text-[10px] font-bold text-white/50 dark:text-gray-400">NIGHT</span>
+        </div>
 
         <div class="relative z-10 flex flex-col items-center">
             <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain drop-shadow-lg">
