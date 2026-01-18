@@ -426,13 +426,38 @@ async function joinRoom(roomId) {
         // Check permission
         const isAuthorized = currentUser && (currentUser.uid === currentRoomCreatorId || sharedControl === true);
 
+        // Elements to control
+        const volumeWrapper = document.getElementById('remote-volume-wrapper');
+        const prevBtn = document.getElementById('prev-btn');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const nextBtn = document.getElementById('skip-btn');
+        const progressHandle = document.getElementById('remote-progress-handle');
+        const progressContainer = document.getElementById('remote-progress-container');
+        const progressWrapper = progressContainer ? progressContainer.closest('.group/prog') : null;
+
+        // Admin controls section should always be visible now (to see shuffle/repeat)
+        if (adminControls) adminControls.classList.remove('hidden');
+
         if (isAuthorized) {
-            // Authorized: Show controls, Hide overlay (just in case), Enable interaction
-            adminControls.classList.remove('hidden', 'opacity-50', 'pointer-events-none');
-            adminOverlay.classList.add('hidden');
+            // Authorized: Enable everything
+            if (volumeWrapper) volumeWrapper.classList.remove('hidden');
+            if (prevBtn) prevBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (playPauseBtn) playPauseBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (nextBtn) nextBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (progressHandle) progressHandle.classList.remove('hidden');
+            if (progressWrapper) progressWrapper.classList.remove('pointer-events-none');
+            if (progressContainer) progressContainer.classList.remove('cursor-default');
+            if (adminOverlay) adminOverlay.classList.add('hidden');
         } else {
-            // Unauthorized: Hide COMPLETELY (User Request)
-            adminControls.classList.add('hidden');
+            // Unauthorized: Granular disable
+            if (volumeWrapper) volumeWrapper.classList.add('hidden');
+            if (prevBtn) prevBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (playPauseBtn) playPauseBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (nextBtn) nextBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (progressHandle) progressHandle.classList.add('hidden');
+            if (progressWrapper) progressWrapper.classList.add('pointer-events-none'); // Disable hover effects
+            if (progressContainer) progressContainer.classList.add('cursor-default');
+            if (adminOverlay) adminOverlay.classList.add('hidden'); // We don't need the overlay anymore
         }
     };
 
