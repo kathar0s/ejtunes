@@ -1573,13 +1573,14 @@ async function addToQueue(video) {
             console.warn('Could not fetch video duration', e);
         }
 
+        const requesterName = (currentUser.uid === currentRoomCreatorId) ? t('host') : (currentUser.displayName || 'Anonymous');
         const queueRef = ref(db, `rooms/${currentRoomId}/queue`);
         await push(queueRef, {
             videoId: video.id,
             title: video.title,
             artist: video.artist || '',
             thumbnail: video.thumb,
-            requester: currentUser.displayName || 'Anonymous',
+            requester: requesterName,
             requesterId: currentUser.uid,
             duration: duration,
             createdAt: serverTimestamp(),
