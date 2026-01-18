@@ -55,19 +55,19 @@
     <!-- Setup Screen (Hidden by default to prevent FOUC on restore) -->
     <div id="setup-screen" class="hidden legacy-flex-center absolute inset-0 z-50 bg-black p-8 w-full h-full"
         style="display: none;">
-        <div class="text-6xl mb-6">🎧</div>
+        <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain">
         <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTunes</h1>
         <p class="text-gray-400 mb-8" data-i18n="create_room_desc">Create a room to start hosting</p>
 
         <div class="w-full max-w-sm space-y-4">
             <input type="text" id="room-name-input" placeholder="Room name (e.g. 5F Lounge)"
                 data-i18n="room_name_placeholder"
-                class="w-full bg-brand-gray border border-white/20 focus:border-brand-neon rounded-xl py-3 px-4 text-center text-lg outline-none transition">
+                class="w-full bg-brand-gray border border-white/20 focus:border-brand-mint rounded-xl py-3 px-4 text-center text-lg outline-none transition">
 
             <div id="room-name-error" class="hidden text-red-500 text-sm font-bold mt-2"></div>
 
             <button id="create-room-btn"
-                class="w-full bg-brand-neon text-black py-3 rounded-xl font-bold text-lg hover:bg-orange-400 transition"
+                class="w-full bg-brand-mint text-black py-3 rounded-xl font-bold text-lg hover:bg-brand-mint/80 transition"
                 data-i18n="create_room">
                 Create Room
             </button>
@@ -84,7 +84,7 @@
                         class="flex-1 py-3 border border-white/20 rounded-xl hover:bg-white/10 transition"
                         data-i18n="change_name">Change Name</button>
                     <button id="modal-reuse-btn"
-                        class="flex-1 py-3 bg-brand-neon text-black rounded-xl font-bold hover:bg-orange-400 transition"
+                        class="flex-1 py-3 bg-brand-mint text-black rounded-xl font-bold hover:bg-brand-mint/80 transition"
                         data-i18n="reuse_room">Reuse Room</button>
                 </div>
             </div>
@@ -110,14 +110,14 @@
             <button id="room-info-trigger"
                 class="flex items-center gap-3 hover:bg-white/10 p-2 rounded-xl transition cursor-pointer text-left">
                 <div
-                    class="w-8 h-8 bg-brand-neon rounded-full flex items-center justify-center text-black font-bold relative">
+                    class="w-8 h-8 bg-brand-mint rounded-full flex items-center justify-center text-black font-bold relative">
                     DJ
                     <span id="host-count-badge"
                         class="hidden absolute -bottom-1 -right-1 w-4 h-4 bg-white text-black text-[10px] font-bold rounded-full flex items-center justify-center shadow"></span>
                 </div>
                 <div>
                     <h1 id="room-name" class="font-bold text-lg leading-tight">Room Name</h1>
-                    <p class="text-xs text-brand-neon font-mono tracking-wider" id="room-code">#CODE</p>
+                    <p class="text-xs text-brand-mint font-mono tracking-wider" id="room-code">#CODE</p>
                 </div>
             </button>
 
@@ -125,7 +125,7 @@
             <div class="flex-1 max-w-xl mx-4 relative hidden sm:block">
                 <input type="text" id="host-search-input-top" placeholder="Paste YouTube URL or search..."
                     data-i18n="search_placeholder" autocomplete="off"
-                    class="w-full bg-brand-gray border border-white/10 focus:border-brand-neon rounded-full py-2 px-4 pr-10 text-sm outline-none transition">
+                    class="w-full bg-brand-gray border border-white/10 focus:border-brand-mint rounded-full py-2 px-4 pr-10 text-sm outline-none transition">
                 <button id="clear-search-btn-top"
                     class="hidden absolute right-10 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white mr-1 text-lg leading-none">✕</button>
                 <button id="host-search-submit-top"
@@ -198,9 +198,9 @@
                 </div>
 
                 <!-- Last Controller Info (hidden by default) -->
-                <div id="last-controller-info" class="hidden mb-4 p-3 bg-brand-neon/10 rounded-lg text-left">
+                <div id="last-controller-info" class="hidden mb-4 p-3 bg-brand-mint/10 rounded-lg text-left">
                     <p class="text-xs text-gray-400" data-i18n="last_controller">Last controlled by</p>
-                    <p id="last-controller-name" class="text-sm text-brand-neon font-bold">-</p>
+                    <p id="last-controller-name" class="text-sm text-brand-mint font-bold">-</p>
                 </div>
 
                 <button id="delete-room-btn"
@@ -242,7 +242,7 @@
                     <div class="relative flex-1">
                         <input type="text" id="host-search-input" placeholder="Search..." data-i18n="search_placeholder"
                             autocomplete="off"
-                            class="w-full bg-brand-gray border border-transparent focus:border-brand-neon rounded-full py-3 px-4 pr-10 text-base outline-none transition">
+                            class="w-full bg-brand-gray border border-transparent focus:border-brand-mint rounded-full py-3 px-4 pr-10 text-base outline-none transition">
 
                         <button id="clear-search-btn"
                             class="hidden absolute right-10 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-1">✕</button>
@@ -269,39 +269,35 @@
         <!-- Mini Player (Footer) -->
         <!-- Layout: under xs (480px): 3 rows | xs-sm (480-639px): 2 rows | sm+ (640px+): 1 row -->
         <footer id="mini-player"
-            class="h-auto min-h-[5rem] md:h-20 bg-brand-gray border-t border-white/10 flex flex-row flex-wrap md:flex-nowrap items-center px-4 py-3 md:py-0 z-40 relative group cursor-pointer transition-all duration-300">
+            class="h-auto min-h-[5rem] md:h-20 bg-brand-gray border-t border-white/10 flex flex-row flex-wrap md:flex-nowrap items-center px-4 py-3 md:py-0 z-40 relative group transition-all duration-300">
             <!-- Progress Bar (Top Edge) -->
-            <div class="absolute top-0 left-0 right-0 h-1 bg-white/10 group/progress">
-                <div id="progress-bar-mini" class="h-full bg-brand-neon w-0 transition-all duration-1000 relative">
-                    <!-- Glow effect for progress bar -->
-                    <div
-                        class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-[0_0_10px_rgba(238,122,69,0.8)] opacity-0 group-hover/progress:opacity-100 transition-opacity">
+            <div id="mini-progress-container"
+                class="absolute top-0 left-0 right-0 -translate-y-[10px] h-6 flex items-center cursor-pointer group/prog z-50">
+                <div class="relative w-full h-1 bg-white/20">
+                    <div id="progress-bar-mini" class="h-full bg-brand-mint w-0 transition-all duration-1000 relative">
                     </div>
+                    <div id="mini-progress-handle"
+                        class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none transition-all duration-1000"
+                        style="left: 0%"></div>
                 </div>
             </div>
 
             <!-- Track Info: Full width (Row 1) on mobile, 1/3 (Col 1) on desktop -->
-            <div class="flex items-center gap-3 w-full md:w-1/3 min-w-0 pr-2 mb-3 md:mb-0 order-1">
+            <div id="mini-track-info"
+                class="flex items-center gap-3 w-full md:w-1/3 min-w-0 pr-2 mb-3 md:mb-0 order-1 cursor-pointer">
                 <!-- Thumbnail -->
                 <div class="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 relative group/thumb">
                     <img id="mini-art"
                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                         class="w-full h-full object-cover">
-                    <!-- Expand overlay on thumbnail hover -->
-                    <div
-                        class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity">
-                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path
-                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
-                        </svg>
-                    </div>
+
                 </div>
                 <!-- Text Info -->
                 <div class="min-w-0 flex-1 flex flex-col justify-center">
                     <div class="flex items-center">
                         <h4 id="mini-title" class="font-bold text-sm truncate text-white">Waiting...</h4>
                         <span
-                            class="text-[0.6rem] px-1.5 py-0.5 rounded bg-white/10 text-brand-neon border border-brand-neon/30 hidden"
+                            class="text-[0.6rem] px-1.5 py-0.5 rounded bg-white/10 text-brand-mint border border-brand-mint/30 hidden"
                             id="mini-requester-badge">DJ</span>
                     </div>
                     <p id="mini-artist" class="text-xs text-gray-400 truncate">System</p>
@@ -312,19 +308,19 @@
             <div class="w-full w-xs-60 md:w-auto md:flex-1 flex justify-center xs:justify-start md:justify-center items-center gap-1 sm:gap-4 order-2 xs:mb-0"
                 onclick="event.stopPropagation()">
                 <!-- Shuffle Button -->
-                <button id="mini-shuffle-btn" class="p-2 text-gray-400 hover:text-white transition">
+                <button id="mini-shuffle-btn" class="p-2 text-gray-400 hover:text-white transition cursor-pointer">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                         <path
                             d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
                     </svg>
                 </button>
-                <button id="mini-prev-btn" class="p-2 text-gray-400 hover:text-white transition">
+                <button id="mini-prev-btn" class="p-2 text-gray-400 hover:text-white transition cursor-pointer">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
                     </svg>
                 </button>
                 <button id="mini-play-btn"
-                    class="p-2 bg-white text-black rounded-full hover:scale-105 transition shadow-lg mx-1 sm:mx-2">
+                    class="p-2 bg-white text-black rounded-full hover:scale-105 transition shadow-lg mx-1 sm:mx-2 cursor-pointer">
                     <svg id="mini-play-icon" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M8 5v14l11-7z" />
                     </svg>
@@ -332,13 +328,13 @@
                         <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                     </svg>
                 </button>
-                <button id="mini-next-btn" class="p-2 text-gray-400 hover:text-white transition">
+                <button id="mini-next-btn" class="p-2 text-gray-400 hover:text-white transition cursor-pointer">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                     </svg>
                 </button>
                 <!-- Repeat Button -->
-                <button id="mini-repeat-btn" class="p-2 text-gray-400 hover:text-white transition">
+                <button id="mini-repeat-btn" class="p-2 text-gray-400 hover:text-white transition cursor-pointer">
                     <svg id="mini-repeat-icon-all" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6z" />
                     </svg>
@@ -349,34 +345,37 @@
                 </button>
             </div>
 
-            <!-- Volume & Expand: Full width below sm, Right-aligned on sm+ -->
+            <!-- Mini Volume & Expand -->
             <div class="w-full w-xs-40 md:w-1/3 flex justify-end items-center gap-2 order-3"
                 onclick="event.stopPropagation()">
-                <!-- Volume -->
+                <!-- Volume (Visible on all sizes for mini-player now) -->
                 <div class="flex items-center gap-2 flex-1 sm:flex-none">
-                    <button id="host-mute-toggle" class="text-gray-400 hover:text-white transition flex-shrink-0"
-                        title="Mute">
-                        <svg id="host-volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <button id="mini-mute-toggle"
+                        class="text-gray-400 hover:text-white transition flex-shrink-0 cursor-pointer" title="Mute">
+                        <svg id="mini-volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path
                                 d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
                         </svg>
-                        <svg id="host-mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                        <svg id="mini-mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
                             <path
                                 d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
                         </svg>
                     </button>
-                    <div class="relative bg-gray-600 rounded-full overflow-hidden flex-1 sm:w-24 sm:flex-none"
-                        style="height: 4px; min-width: 80px;">
-                        <div id="host-volume-fill"
-                            class="absolute left-0 top-0 h-full bg-white rounded-full transition-all duration-100"
-                            style="width: 100%"></div>
-                        <input type="range" id="host-volume" min="0" max="100" value="100"
-                            class="absolute inset-0 w-full h-full cursor-pointer opacity-0">
+                    <div class="relative h-10 flex items-center flex-1 sm:w-24 sm:flex-none" style="min-width: 80px;">
+                        <div
+                            class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-gray-600 rounded-full overflow-hidden">
+                            <div id="mini-volume-fill"
+                                class="absolute left-0 top-0 h-full bg-white rounded-full transition-all duration-100"
+                                style="width: 100%"></div>
+                        </div>
+                        <input type="range" id="mini-volume" min="0" max="100" value="100"
+                            class="absolute inset-0 w-full h-full cursor-pointer z-10">
                     </div>
                 </div>
+
                 <!-- Expand Button -->
                 <button id="expand-player-btn"
-                    class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition">
+                    class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition cursor-pointer">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                     </svg>
@@ -489,7 +488,7 @@
                         <p id="full-artist" class="text-lg sm:text-xl text-gray-400 line-clamp-1">System</p>
                         <div class="pt-2 flex items-center justify-center lg:justify-start gap-3">
                             <div class="px-3 py-1 bg-white/10 rounded-full text-xs text-gray-300">
-                                Requested by <span id="full-requester" class="font-bold text-brand-neon">System</span>
+                                Requested by <span id="full-requester" class="font-bold text-brand-mint">System</span>
                             </div>
                             <div class="flex items-center gap-1 text-red-400 font-bold select-none cursor-default">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -501,12 +500,15 @@
                         </div>
                     </div>
 
-                    <!-- Progress Bar -->
-                    <div class="w-full group/prog cursor-pointer py-2">
-                        <div class="h-1 bg-white/20 rounded-full overflow-hidden group-hover/prog:h-2 transition-all">
-                            <div id="full-progress-bar" class="h-full bg-brand-neon w-0"></div>
+                    <div class="w-full group/prog cursor-pointer py-3 px-1">
+                        <div id="full-progress-container" class="relative h-1.5 bg-white/20 rounded-full">
+                            <div id="full-progress-bar" class="absolute left-0 top-0 h-full bg-brand-mint rounded-full"
+                                style="width: 0%"></div>
+                            <div id="full-progress-handle"
+                                class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none"
+                                style="left: 0%"></div>
                         </div>
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <div class="flex justify-between text-xs text-gray-500 mt-2">
                             <span id="prog-current">0:00</span>
                             <span id="prog-duration">--:--</span>
                         </div>
@@ -522,13 +524,13 @@
                         </button>
 
                         <button id="full-prev-btn"
-                            class="p-3 sm:p-4 text-white hover:text-brand-neon transition hover:scale-110">
+                            class="p-3 sm:p-4 text-white hover:text-brand-mint transition hover:scale-110">
                             <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
                             </svg>
                         </button>
                         <button id="full-play-btn"
-                            class="p-5 sm:p-6 bg-brand-neon text-black rounded-full hover:scale-110 transition shadow-lg shadow-brand-neon/30">
+                            class="p-5 sm:p-6 bg-brand-mint text-black rounded-full hover:scale-110 transition shadow-lg shadow-brand-mint/30">
                             <svg id="full-play-icon" class="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24"
                                 fill="currentColor">
                                 <path d="M8 5v14l11-7z" />
@@ -539,7 +541,7 @@
                             </svg>
                         </button>
                         <button id="full-next-btn"
-                            class="p-3 sm:p-4 text-white hover:text-brand-neon transition hover:scale-110">
+                            class="p-3 sm:p-4 text-white hover:text-brand-mint transition hover:scale-110">
                             <svg class="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                             </svg>
@@ -570,22 +572,23 @@
                                     d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
                             </svg>
                         </button>
-                        <div class="flex-1 relative h-1 bg-gray-600 rounded-full overflow-hidden">
-                            <div id="full-volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
-                                style="width: 100%"></div>
+                        <div class="flex-1 relative h-6 flex items-center group/vol">
+                            <div class="w-full h-1 bg-gray-600 rounded-full relative overflow-hidden">
+                                <div id="full-volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
+                                    style="width: 100%"></div>
+                            </div>
                             <input type="range" id="full-volume" min="0" max="100" value="100"
-                                class="absolute inset-0 w-full h-full cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
+                                class="absolute inset-0 w-full h-full cursor-pointer">
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Hidden Youtube Player -->
+            <div id="player" class="absolute pointer-events-none opacity-0 w-1 h-1 top-0 left-0"></div>
         </div>
 
-        <!-- Hidden Youtube Player -->
-        <div id="player" class="absolute pointer-events-none opacity-0 w-1 h-1 top-0 left-0"></div>
-    </div>
-
-    <script type="module" src="../src/host.js"></script>
+        <script type="module" src="../src/host.js"></script>
 </body>
 
 </html>

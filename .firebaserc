@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "ejtunes-music"
+  },
+  "targets": {
+    "ejtunes-music": {
+      "hosting": {
+        "ejtunes": [
+          "ejtunes"
+        ]
+      }
+    }
   }
 }

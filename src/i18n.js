@@ -3,7 +3,7 @@ const resources = {
     en: {
         app_title: "EJTunes",
         create_room: "Create Room",
-        create_room_desc: "Create a room to start hosting",
+        create_room_desc: "Enjoy Jamming Together",
         join_room: "Join Room",
         room_name_placeholder: "Room Name (e.g. 5F Lounge)",
         room_code_placeholder: "Enter Room Code",
@@ -69,7 +69,7 @@ const resources = {
     ko: {
         app_title: "EJTunes",
         create_room: "방 만들기",
-        create_room_desc: "방을 만들고 다른사람과 함께 음악을 즐기세요!",
+        create_room_desc: "함께 즐거운 음악 시간을 즐기세요!",
         join_room: "방 입장하기",
         room_name_placeholder: "방 이름 (예: 5층 라운지)",
         room_code_placeholder: "방 코드 입력",

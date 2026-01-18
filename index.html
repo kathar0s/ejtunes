@@ -17,7 +17,7 @@
 
     <!-- iOS Apple Touch Icon -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <meta name="theme-color" content="#1DB954">
+    <meta name="theme-color" content="#111315">
     <style>
         .legacy-flex-center {
             display: -webkit-box;
@@ -43,13 +43,13 @@
     <div id="host-disconnected-modal"
         class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-fade-in">
         <div class="bg-gray-900 border border-white/10 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
-            <div class="text-6xl mb-6">🔌</div>
+            <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-24 h-24 mb-6 object-contain">
             <h3 class="text-2xl font-bold mb-2 text-white" data-i18n="host_disconnected_title">Connection Lost</h3>
             <p class="text-gray-400 mb-8 leading-relaxed" data-i18n="host_disconnected_msg">The host has ended the
                 session.</p>
             <div class="flex flex-col gap-3">
                 <button id="reconnect-btn"
-                    class="w-full py-3 bg-brand-neon text-black rounded-xl font-bold text-lg hover:scale-105 transition shadow-lg shadow-brand-neon/20"
+                    class="w-full py-3 bg-brand-mint text-black rounded-xl font-bold text-lg hover:scale-105 transition shadow-lg shadow-brand-mint/20"
                     data-i18n="reconnect">Reconnect</button>
                 <button id="return-home-btn"
                     class="w-full py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-lg hover:bg-white/20 transition"
@@ -61,13 +61,13 @@
     <!-- Loading Screen (Initial State) -->
     <div id="loading-screen"
         class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
-        <div class="w-12 h-12 border-4 border-brand-neon border-t-transparent rounded-full animate-spin"></div>
+        <div class="w-12 h-12 border-4 border-brand-mint border-t-transparent rounded-full animate-spin"></div>
     </div>
 
     <!-- Login Screen -->
     <div id="login-screen"
         class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full">
-        <div class="text-6xl mb-6">🎵</div>
+        <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain">
         <h1 class="text-4xl font-bold mb-2" data-i18n="app_title">EJTunes</h1>
         <p class="text-gray-400 mb-8" data-i18n="join_room">Collaborative music for your workspace</p>
         <button id="login-btn"
@@ -101,7 +101,7 @@
 
                     <!-- Avatar Button -->
                     <button id="avatar-btn-select"
-                        class="w-8 h-8 rounded-full overflow-hidden border border-white/20 hover:border-brand-neon transition relative">
+                        class="w-8 h-8 rounded-full overflow-hidden border border-white/20 hover:border-brand-mint transition relative">
                         <img id="user-avatar"
                             src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                             class="w-full h-full object-cover">
@@ -123,7 +123,7 @@
                     <div id="profile-popover-select"
                         class="hidden absolute top-12 right-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-right transition-all">
                         <div class="flex flex-col items-center mb-4">
-                            <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-neon mb-2">
+                            <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-mint mb-2">
                                 <img id="popover-avatar-select" src="" class="w-full h-full object-cover">
                             </div>
                             <p id="popover-name-select" class="font-bold text-lg"></p>
@@ -146,10 +146,10 @@
                 <div class="flex gap-2">
                     <input type="text" id="room-code-input" placeholder="Enter room code"
                         data-i18n="room_code_placeholder"
-                        class="flex-1 min-w-0 bg-brand-gray border border-white/20 focus:border-brand-neon rounded-xl py-3 px-4 text-center uppercase tracking-widest font-mono outline-none transition"
+                        class="flex-1 min-w-0 bg-brand-gray border border-white/20 focus:border-brand-mint rounded-xl py-3 px-4 text-center uppercase tracking-widest font-mono outline-none transition"
                         maxlength="6" autocomplete="off">
                     <button id="join-room-btn"
-                        class="bg-brand-neon text-black px-6 shrink-0 min-w-[80px] rounded-xl font-bold hover:bg-orange-400 transition"
+                        class="bg-brand-mint text-black px-6 shrink-0 min-w-[80px] rounded-xl font-bold hover:bg-brand-mint/80 transition"
                         data-i18n="join">
                         Join
                     </button>
@@ -173,17 +173,26 @@
                         <!-- Avatar Button (Moved to Left) -->
                         <div class="relative z-50">
                             <button id="avatar-btn-app"
-                                class="w-10 h-10 rounded-full overflow-hidden border-2 border-brand-neon hover:scale-105 transition block shadow-lg shadow-brand-neon/20">
+                                class="relative w-10 h-10 rounded-full overflow-hidden border-2 border-brand-mint hover:scale-105 transition block shadow-lg shadow-brand-mint/20">
                                 <img id="app-user-avatar"
                                     src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                     class="w-full h-full object-cover">
                             </button>
+                            <!-- Host Badge -->
+                            <div id="host-badge"
+                                class="hidden absolute -top-1 -right-1 bg-yellow-400 text-black p-0.5 rounded-full border-2 border-brand-gray z-50 animate-bounce-small shadow-lg"
+                                title="Host">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .667-.333 1-1 1H6c-.667 0-1-.333-1-1v-1h14v1z" />
+                                </svg>
+                            </div>
 
                             <!-- Combined Profile & Language Popover -->
                             <div id="profile-popover-app"
                                 class="hidden absolute top-14 left-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-left transition-all animate-fade-in-up">
                                 <div class="flex flex-col items-center mb-4">
-                                    <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-neon mb-2">
+                                    <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-mint mb-2">
                                         <img id="popover-avatar-app" src="" class="w-full h-full object-cover">
                                     </div>
                                     <p id="popover-name-app" class="font-bold text-lg"></p>
@@ -196,7 +205,7 @@
                                         Language</p>
                                     <div class="relative">
                                         <select id="lang-select-app"
-                                            class="w-full appearance-none bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-brand-neon transition cursor-pointer">
+                                            class="w-full appearance-none bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-brand-mint transition cursor-pointer">
                                             <option value="en" class="text-black">🇺🇸 English</option>
                                             <option value="ko" class="text-black">🇰🇷 한국어</option>
                                         </select>
@@ -226,7 +235,7 @@
                             <button id="room-info-btn"
                                 class="w-fit max-w-full text-left rounded-lg px-2 -ml-2 py-1 transition group">
                                 <h1 id="current-room-name" class="font-bold truncate text-lg transition">Room</h1>
-                                <p id="current-room-code" class="text-xs text-brand-neon font-mono"></p>
+                                <p id="current-room-code" class="text-xs text-brand-mint font-mono"></p>
                             </button>
 
                             <!-- Room Info Popover -->
@@ -275,7 +284,7 @@
                     <div class="flex-1 relative flex items-center">
                         <input type="text" id="search-input" placeholder="Paste YouTube URL or search..."
                             data-i18n="search_placeholder" autocomplete="off"
-                            class="w-full bg-white/10 border border-transparent focus:border-brand-neon rounded-full py-2 pl-4 pr-20 text-sm outline-none transition text-white placeholder-gray-400">
+                            class="w-full bg-white/10 border border-transparent focus:border-brand-mint rounded-full py-2 pl-4 pr-20 text-sm outline-none transition text-white placeholder-gray-400">
 
                         <!-- Actions Container -->
                         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -290,7 +299,7 @@
 
                             <!-- Submit Button -->
                             <button id="search-submit-btn"
-                                class="text-brand-neon hover:text-white p-1.5 rounded-full hover:bg-white/10 transition">
+                                class="text-brand-mint hover:text-white p-1.5 rounded-full hover:bg-white/10 transition">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -322,7 +331,7 @@
                         </div>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs text-brand-neon font-bold uppercase tracking-wider mb-1"
+                        <p class="text-xs text-brand-mint font-bold uppercase tracking-wider mb-1"
                             data-i18n="now_playing">Now Playing</p>
                         <h2 id="np-title" class="font-bold text-lg truncate">No music playing</h2>
                         <p id="np-requester" class="text-gray-400 text-sm truncate" data-i18n="add_song_msg">Add a song
@@ -337,20 +346,21 @@
 
                 <!-- Progress Bar -->
                 <div id="remote-progress-section" class="mt-3 px-1">
-                    <div class="group/prog cursor-pointer py-2">
-                        <div id="remote-progress-container"
-                            class="h-1 bg-white/20 rounded-full overflow-hidden relative">
-                            <div id="remote-progress-fill"
-                                class="h-full bg-brand-neon w-0 absolute top-0 left-0 pointer-events-none transition-all duration-100 ease-linear">
+                    <div class="group/prog cursor-pointer">
+                        <div id="remote-progress-container" class="relative w-full h-8 flex items-center group">
+                            <div class="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                <div id="remote-progress-fill"
+                                    class="absolute left-0 top-0 h-full bg-brand-mint rounded-full pointer-events-none transition-all duration-300 ease-linear"
+                                    style="width: 0%;"></div>
                             </div>
                             <div id="remote-progress-handle"
-                                class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow pointer-events-none transition-all duration-100 ease-linear -left-1.5 opacity-0 group-hover/prog:opacity-100">
-                            </div>
+                                class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none"
+                                style="left: 0%;"></div>
                         </div>
-                        <div class="flex justify-between text-xs text-gray-500 mt-1 select-none">
-                            <span id="remote-current-time">0:00</span>
-                            <span id="remote-total-time">0:00</span>
-                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mt-1 select-none">
+                        <span id="remote-current-time">0:00</span>
+                        <span id="remote-total-time">0:00</span>
                     </div>
                 </div>
 
@@ -364,28 +374,8 @@
                             Host Control Only
                         </span>
                     </div>
-                    <!-- Volume & Shuffle -->
-                    <div class="flex items-center gap-3 mb-4">
-
-                        <button id="mute-toggle" class="p-1 text-gray-400 hover:text-white transition" title="Mute">
-                            <svg id="volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                            </svg>
-                            <svg id="mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-                            </svg>
-                        </button>
-                        <div class="flex-1 relative h-1 bg-gray-700 rounded-full overflow-hidden">
-                            <div id="volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
-                                style="width: 100%"></div>
-                            <input type="range" id="remote-volume" min="0" max="100" value="100"
-                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                        </div>
-                    </div>
                     <!-- Playback Controls -->
-                    <div class="flex items-center justify-center gap-1 xs:gap-4 sm:gap-6">
+                    <div class="flex items-center justify-center gap-1 xs:gap-4 sm:gap-6 mb-4">
                         <button id="shuffle-toggle" class="p-2 text-gray-500 hover:text-white transition"
                             title="Shuffle">
                             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -393,7 +383,7 @@
                                     d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
                             </svg>
                         </button>
-                        <button id="prev-btn" class="p-3 text-white hover:text-brand-neon transition">
+                        <button id="prev-btn" class="p-3 text-white hover:text-brand-mint transition">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
                             </svg>
@@ -407,7 +397,7 @@
                                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                             </svg>
                         </button>
-                        <button id="skip-btn" class="p-3 text-white hover:text-brand-neon transition">
+                        <button id="skip-btn" class="p-3 text-white hover:text-brand-mint transition">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                             </svg>
@@ -422,6 +412,29 @@
                                     d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
                             </svg>
                         </button>
+                    </div>
+
+                    <!-- Volume -->
+                    <div class="flex items-center gap-3">
+                        <button id="mute-toggle" class="p-1 text-gray-400 hover:text-white transition" title="Mute">
+                            <svg id="volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                            </svg>
+                            <svg id="mute-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0021 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                            </svg>
+                        </button>
+                        <div class="flex-1 relative h-6 flex items-center group/vol">
+                            <div class="w-full h-1 bg-gray-600 rounded-full relative overflow-hidden">
+                                <div id="remote-volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
+                                    style="width: 100%">
+                                </div>
+                            </div>
+                            <input type="range" id="remote-volume" min="0" max="100" value="100"
+                                class="absolute inset-0 w-full h-full cursor-pointer">
+                        </div>
                     </div>
                 </div>
             </section>

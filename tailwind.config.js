@@ -18,10 +18,10 @@ export default {
         },
         extend: {
             colors: {
-                'brand-dark': '#121212',
-                'brand-gray': '#1E1E1E',
-                'brand-neon': '#EE7A45',
-                'brand-accent': '#535353',
+                'brand-dark': '#111315', // Charcoal Black
+                'brand-gray': '#1E1E1E', // Charcoal
+                'brand-mint': '#44C6CC', // Maldives Mint (Accent)
+                'brand-offwhite': '#F7F7F5', // Off-White (Light mode bg)
             },
             animation: {
                 'spin-slow': 'spin 8s linear infinite',

@@ -49,7 +49,7 @@ function updateLeaderUI() {
     const deleteBtn = document.getElementById('delete-room-btn');
     if (isAmILeader()) {
         if (textNode) textNode.textContent = '👑';
-        iconContainer.classList.remove('bg-brand-neon', 'text-black', 'border-white');
+        iconContainer.classList.remove('bg-brand-mint', 'text-black', 'border-white');
         // Gold border with dark background for high contrast with the emoji
         iconContainer.classList.add('bg-gray-900', 'text-white', 'border-2', 'border-yellow-400', 'shadow-lg', 'shadow-yellow-400/20');
         iconContainer.style.fontSize = '1.25rem'; // Slightly larger emoji
@@ -62,7 +62,7 @@ function updateLeaderUI() {
         }
     } else {
         if (textNode) textNode.textContent = 'DJ';
-        iconContainer.classList.add('bg-brand-neon', 'text-black');
+        iconContainer.classList.add('bg-brand-mint', 'text-black');
         iconContainer.classList.remove('bg-gray-900', 'text-white', 'border-2', 'border-yellow-400', 'shadow-lg', 'shadow-yellow-400/20');
         if (iconContainer.classList.contains('border-white')) iconContainer.classList.remove('border-2');
         iconContainer.style.removeProperty('font-size');
@@ -191,7 +191,6 @@ const miniRepeatBtn = document.getElementById('mini-repeat-btn');
 const miniRepeatIconAll = document.getElementById('mini-repeat-icon-all');
 const miniRepeatIconOne = document.getElementById('mini-repeat-icon-one');
 const expandPlayerBtn = document.getElementById('expand-player-btn');
-const hostVolume = document.getElementById('host-volume');
 const progressBarMini = document.getElementById('progress-bar-mini');
 
 // Full Player Elements
@@ -213,8 +212,17 @@ const fullRepeatBtn = document.getElementById('full-repeat-btn');
 const fullRepeatIconAll = document.getElementById('full-repeat-icon-all');
 const fullRepeatIconOne = document.getElementById('full-repeat-icon-one');
 const fullVolume = document.getElementById('full-volume');
+const hostVolume = document.getElementById('host-volume');
+const hostMuteToggle = document.getElementById('host-mute-toggle');
+const hostVolumeIcon = document.getElementById('host-volume-icon');
+const hostMuteIcon = document.getElementById('host-mute-icon');
+const fullMuteToggle = document.getElementById('full-mute-toggle');
+const miniVolume = document.getElementById('mini-volume');
+const miniMuteToggle = document.getElementById('mini-mute-toggle');
 const collapsePlayerBtn = document.getElementById('collapse-player-btn');
 const fullProgressBar = document.getElementById('full-progress-bar');
+const fullProgressHandle = document.getElementById('full-progress-handle');
+const miniProgressHandle = document.getElementById('mini-progress-handle');
 const progCurrent = document.getElementById('prog-current');
 const progDuration = document.getElementById('prog-duration');
 
@@ -278,6 +286,7 @@ const updateLangDisplay = () => {
     }
 };
 
+console.log('[Host] Script initialized');
 initLanguage();
 updatePageText();
 updateLangDisplay();
@@ -347,8 +356,10 @@ langToggleSetup.addEventListener('click', () => {
 });
 
 createRoomBtn.addEventListener('click', async () => {
+    console.log('[Create Room] Clicked');
     const roomNameError = document.getElementById('room-name-error');
     const showError = (msg) => {
+        console.warn('[Create Room] Error:', msg);
         roomNameError.textContent = msg;
         roomNameError.classList.remove('hidden');
     };
@@ -366,80 +377,90 @@ createRoomBtn.addEventListener('click', async () => {
         }
     }
 
-    let name = roomNameInput.value.trim();
-    if (!name) {
-        showError(t('room_name_required') || 'Please enter a room name');
-        return;
-    }
-
-    hideError();
-
-    // Check duplicates or ID lookup
-    let existingId = null;
-
-    if (name.startsWith('#')) {
-        // ID Lookup
-        const targetId = name.substring(1);
-        const snapshot = await get(ref(db, `rooms/${targetId}`));
-        if (snapshot.exists() && snapshot.val().info) {
-            existingId = targetId;
-            name = snapshot.val().info.name; // Use actual room name for display
-        } else {
-            showError('Room not found (방을 찾을 수 없습니다)');
+    try {
+        let name = roomNameInput.value.trim();
+        if (!name) {
+            showError(t('room_name_required') || 'Please enter a room name');
             return;
         }
-    } else {
-        // Name Lookup
-        const roomsRef = ref(db, 'rooms');
-        const snapshot = await get(roomsRef);
 
-        if (snapshot.exists()) {
-            snapshot.forEach((child) => {
-                const info = child.val().info;
-                if (info && info.name === name) {
-                    existingId = child.key;
-                }
-            });
+        hideError();
+
+        // Check duplicates or ID lookup
+        let existingId = null;
+
+        if (name.startsWith('#')) {
+            // ID Lookup
+            const targetId = name.substring(1);
+            const snapshot = await get(ref(db, `rooms/${targetId}`));
+            if (snapshot.exists() && snapshot.val().info) {
+                existingId = targetId;
+                name = snapshot.val().info.name; // Use actual room name for display
+            } else {
+                showError('Room not found (방을 찾을 수 없습니다)');
+                return;
+            }
+        } else {
+            // Name Lookup
+            const roomsRef = ref(db, 'rooms');
+            const snapshot = await get(roomsRef);
+
+            if (snapshot.exists()) {
+                snapshot.forEach((child) => {
+                    const info = child.val().info;
+                    if (info && info.name === name) {
+                        existingId = child.key;
+                    }
+                });
+            }
         }
-    }
 
-    if (existingId) {
-        // Show Custom Modal
-        roomExistsMsg.textContent = t('room_exists_msg', { name: name });
-        roomExistsModal.classList.remove('hidden');
+        if (existingId) {
+            // Show Custom Modal
+            roomExistsMsg.textContent = t('room_exists_msg', { name: name });
+            roomExistsModal.classList.remove('hidden');
 
-        // Handle Reuse
-        const reuseHandler = () => {
+            // Handle Reuse
+            const reuseHandler = async () => {
+                try {
+                    roomName = name;
+                    roomId = existingId;
+                    await setupRoom(roomId, true); // true = reuse
+                    roomExistsModal.classList.add('hidden');
+                    cleanup();
+                } catch (e) {
+                    console.error("Reuse Room Failed:", e);
+                    toast.show("방 연동 실패: " + e.message, { isError: true });
+                }
+            };
+
+            // Handle Cancel (Change Name)
+            const cancelHandler = () => {
+                roomExistsModal.classList.add('hidden');
+                roomNameError.textContent = t('name_taken_error');
+                roomNameError.classList.remove('hidden');
+                roomNameInput.classList.add('border-red-500', 'focus:border-red-500');
+                roomNameInput.focus();
+                cleanup();
+            };
+
+            const cleanup = () => {
+                modalReuseBtn.removeEventListener('click', reuseHandler);
+                modalCancelBtn.removeEventListener('click', cancelHandler);
+            };
+
+            modalReuseBtn.addEventListener('click', reuseHandler);
+            modalCancelBtn.addEventListener('click', cancelHandler);
+
+        } else {
+            // Create New
             roomName = name;
-            roomId = existingId;
-            setupRoom(roomId, true); // true = reuse
-            roomExistsModal.classList.add('hidden');
-            cleanup();
-        };
-
-        // Handle Cancel (Change Name)
-        const cancelHandler = () => {
-            roomExistsModal.classList.add('hidden');
-            roomNameError.textContent = t('name_taken_error');
-            roomNameError.classList.remove('hidden');
-            roomNameInput.classList.add('border-red-500', 'focus:border-red-500');
-            roomNameInput.focus();
-            cleanup();
-        };
-
-        const cleanup = () => {
-            modalReuseBtn.removeEventListener('click', reuseHandler);
-            modalCancelBtn.removeEventListener('click', cancelHandler);
-        };
-
-        modalReuseBtn.addEventListener('click', reuseHandler);
-        modalCancelBtn.addEventListener('click', cancelHandler);
-
-    } else {
-        // Create New
-        roomName = name;
-        roomId = generateRoomCode();
-        setupRoom(roomId, false); // false = new
+            roomId = generateRoomCode();
+            await setupRoom(roomId, false); // false = new
+        }
+    } catch (e) {
+        console.error("Create Room Process Failed:", e);
+        toast.show("방 생성 과정 중 오류 발생: " + e.message, { isError: true });
     }
 });
 
@@ -482,8 +503,13 @@ async function setupRoom(id, isReuse) {
 
     roomUpdates[`rooms/${id}/commands`] = null;
 
-    if (Object.keys(roomUpdates).length > 0) {
-        await update(ref(db), roomUpdates);
+    try {
+        if (Object.keys(roomUpdates).length > 0) {
+            await update(ref(db), roomUpdates);
+        }
+    } catch (e) {
+        console.error("setupRoom DB update failed:", e);
+        throw e; // Re-throw to be caught by caller
     }
 
     // Register Multi-Tab Host Session with Reconnection Support
@@ -582,6 +608,7 @@ function createPlayer() {
     player = new YT.Player('player', {
         height: '1',
         width: '1',
+        host: 'https://www.youtube-nocookie.com',
         playerVars: {
             'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1
         },
@@ -721,11 +748,17 @@ function resetProgressBar() {
     fullProgressBar.style.transition = 'none';
     progressBarMini.style.width = '0%';
     fullProgressBar.style.width = '0%';
+    fullProgressBar.style.width = '0%';
+    if (fullProgressHandle) fullProgressHandle.style.left = '0%';
+    if (miniProgressHandle) miniProgressHandle.style.left = '0%';
     progCurrent.textContent = '0:00';
     requestAnimationFrame(() => {
         setTimeout(() => {
             progressBarMini.style.transition = '';
             fullProgressBar.style.transition = '';
+            fullProgressBar.style.transition = '';
+            if (fullProgressHandle) fullProgressHandle.style.transition = '';
+            if (miniProgressHandle) miniProgressHandle.style.transition = '';
         }, 100);
     });
 }
@@ -742,10 +775,17 @@ function startProgressLoop() {
 
         if (duration > 0) {
             const percent = (current / duration) * 100;
-            progressBarMini.style.width = `${percent}%`;
-            fullProgressBar.style.width = `${percent}%`;
 
-            progCurrent.textContent = formatTime(current);
+            // Only update visuals if user is NOT scrubbing
+            if (!isScrubbing) {
+                progressBarMini.style.width = `${percent}%`;
+                fullProgressBar.style.width = `${percent}%`;
+                if (fullProgressHandle) fullProgressHandle.style.left = `${percent}%`;
+                if (miniProgressHandle) miniProgressHandle.style.left = `${percent}%`;
+                progCurrent.textContent = formatTime(current);
+            }
+
+            // Duration should always be valid
             progDuration.textContent = formatTime(duration);
         }
     }, 1000);
@@ -763,10 +803,21 @@ function formatTime(seconds) {
 }
 
 // Seek Handling with Scrubbing Support
+let activeScrubElement = null;
 let isScrubbing = false;
 
 const onSeekStart = (e) => {
+    // Only handle left click or touch
+    if (e.type === 'mousedown' && e.button !== 0) return;
+
+    console.log('[Host] Seek Start:', e.type);
+
     isScrubbing = true;
+    activeScrubElement = e.currentTarget;
+
+    // Prevent scrolling and default behavior
+    if (e.cancelable) e.preventDefault();
+
     handleScrubVisuals(e);
 };
 
@@ -776,11 +827,15 @@ const onSeekMove = (e) => {
 };
 
 const onSeekEnd = (e) => {
-    if (!isScrubbing && e.type !== 'click') return; // Click handles itself if not scrubbing
+    if (!isScrubbing && e.type !== 'click') return;
+
+    const wasScrubbing = isScrubbing;
     isScrubbing = false;
+    const targetElement = activeScrubElement;
+    activeScrubElement = null;
 
     // Calculate final time and seek
-    const percent = getSeekPercent(e);
+    const percent = getSeekPercent(e, targetElement);
     if (player && isPlayerReady && player.getDuration) {
         const duration = player.getDuration();
         if (duration > 0) {
@@ -793,17 +848,20 @@ const onSeekEnd = (e) => {
             // Disable transition for instant update
             progressBarMini.style.setProperty('transition', 'none', 'important');
             fullProgressBar.style.setProperty('transition', 'none', 'important');
+            if (fullProgressHandle) fullProgressHandle.style.setProperty('transition', 'none', 'important');
 
             // Update progress bar immediately
             const finalPercent = (seekTime / duration) * 100;
             progressBarMini.style.width = `${finalPercent}%`;
             fullProgressBar.style.width = `${finalPercent}%`;
+            if (fullProgressHandle) fullProgressHandle.style.left = `${finalPercent}%`;
             progCurrent.textContent = formatTime(seekTime);
 
             // Restore transition after a short delay
             setTimeout(() => {
                 progressBarMini.style.removeProperty('transition');
                 fullProgressBar.style.removeProperty('transition');
+                if (fullProgressHandle) fullProgressHandle.style.removeProperty('transition');
             }, 100);
 
             // Explicitly update StartedAt to prevent sync drift jump-back
@@ -817,13 +875,16 @@ const onSeekEnd = (e) => {
 };
 
 // Helper for calculating percentage
-const getSeekPercent = (e) => {
+const getSeekPercent = (e, overrideElement = null) => {
     let clientX;
     if (e.touches && e.touches.length > 0) clientX = e.touches[0].clientX;
     else if (e.changedTouches && e.changedTouches.length > 0) clientX = e.changedTouches[0].clientX;
     else clientX = e.clientX;
 
-    const rect = e.currentTarget.getBoundingClientRect();
+    const element = overrideElement || activeScrubElement || e.currentTarget;
+    if (!element || !element.getBoundingClientRect) return 0;
+
+    const rect = element.getBoundingClientRect();
     const x = clientX - rect.left;
     const width = rect.width;
     return Math.max(0, Math.min(0.99, x / width)); // Cap at 99%
@@ -833,8 +894,13 @@ const handleScrubVisuals = (e) => {
     const percent = getSeekPercent(e);
     progressBarMini.style.setProperty('transition', 'none', 'important');
     fullProgressBar.style.setProperty('transition', 'none', 'important');
+    if (fullProgressHandle) fullProgressHandle.style.setProperty('transition', 'none', 'important');
+    if (miniProgressHandle) miniProgressHandle.style.setProperty('transition', 'none', 'important');
+
     progressBarMini.style.width = `${percent * 100}%`;
     fullProgressBar.style.width = `${percent * 100}%`;
+    if (fullProgressHandle) fullProgressHandle.style.left = `${percent * 100}%`;
+    if (miniProgressHandle) miniProgressHandle.style.left = `${percent * 100}%`;
 
     if (player && player.getDuration) {
         const duration = player.getDuration();
@@ -846,14 +912,36 @@ const handleScrubVisuals = (e) => {
 // Bind Events
 const bindSeekEvents = (element) => {
     element.addEventListener('click', onSeekEnd);
-    element.addEventListener('touchstart', onSeekStart, { passive: true });
-    element.addEventListener('touchmove', onSeekMove, { passive: true });
-    element.addEventListener('touchend', onSeekEnd, { passive: true });
+    element.addEventListener('mousedown', onSeekStart);
+    element.addEventListener('touchstart', onSeekStart, { passive: false });
+
+    // Window-level events for smooth tracking even when finger/mouse drifts
+    window.addEventListener('mousemove', onSeekMove);
+    window.addEventListener('mouseup', onSeekEnd);
+    window.addEventListener('touchmove', onSeekMove, { passive: false });
+    window.addEventListener('touchend', onSeekEnd, { passive: false });
 };
 
 // Apply to Progress Bars
-bindSeekEvents(fullProgressBar.parentElement.parentElement);
-bindSeekEvents(progressBarMini.parentElement);
+// Apply to Progress Bars
+const fullContainerEl = document.getElementById('full-progress-container');
+const miniContainerEl = document.getElementById('mini-progress-container');
+
+if (fullContainerEl) {
+    // Full player container is the parent of the progress container in new structure
+    // structure: .group/prog > #full-progress-container
+    const parent = fullContainerEl.parentElement;
+    if (parent) {
+        bindSeekEvents(parent);
+        console.log('[Host] Bound Full Player Seek Events');
+    }
+}
+
+if (miniContainerEl) {
+    // miniContainerEl IS the target element to bind.
+    bindSeekEvents(miniContainerEl);
+    console.log('[Host] Bound Mini Player Seek Events');
+}
 
 // Core Logic (Playlist Mode)
 async function playSong(song) {
@@ -1156,17 +1244,27 @@ function initListeners() {
 
             if (data.volume !== undefined) {
                 player.setVolume(data.volume);
-                hostVolume.value = data.volume;
-                fullVolume.value = data.volume;
+                if (hostVolume) hostVolume.value = data.volume;
+                if (fullVolume) fullVolume.value = data.volume;
+                if (miniVolume) miniVolume.value = data.volume;
+
                 // Update fill elements
                 const hostVolumeFill = document.getElementById('host-volume-fill');
                 const fullVolumeFill = document.getElementById('full-volume-fill');
+                const miniVolumeFill = document.getElementById('mini-volume-fill');
+
                 if (hostVolumeFill) hostVolumeFill.style.width = `${data.volume}%`;
                 if (fullVolumeFill) fullVolumeFill.style.width = `${data.volume}%`;
+                if (miniVolumeFill) miniVolumeFill.style.width = `${data.volume}%`;
+
                 // Update mute icon
-                updateMuteIcon(data.volume);
-                // Update mute icon
-                updateMuteIcon(data.volume);
+                const isMuted = parseInt(data.volume) === 0;
+                document.getElementById('host-volume-icon')?.classList.toggle('hidden', isMuted);
+                document.getElementById('host-mute-icon')?.classList.toggle('hidden', !isMuted);
+                document.getElementById('full-volume-icon')?.classList.toggle('hidden', isMuted);
+                document.getElementById('full-mute-icon')?.classList.toggle('hidden', !isMuted);
+                document.getElementById('mini-volume-icon')?.classList.toggle('hidden', isMuted);
+                document.getElementById('mini-mute-icon')?.classList.toggle('hidden', !isMuted);
             }
         }
 
@@ -1185,10 +1283,10 @@ function initListeners() {
 
             if (isPlaying) {
                 el.classList.remove('hover:bg-white/10');
-                el.style.backgroundColor = '#2a1f16';
-                el.classList.add('border-brand-neon/50');
+                el.classList.add('border-brand-mint/50');
+                el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
                 el.classList.remove('border-white/5');
-                el.querySelector('.title-text')?.classList.add('text-brand-neon');
+                el.querySelector('.title-text')?.classList.add('text-brand-mint');
 
                 // Add equalizer overlay if not present
                 if (thumbContainer && !thumbContainer.querySelector('.equalizer-overlay')) {
@@ -1206,10 +1304,10 @@ function initListeners() {
                 }
             } else {
                 el.classList.add('hover:bg-white/10');
-                el.style.backgroundColor = '#1E1E1E';
-                el.classList.remove('border-brand-neon/50');
+                el.style.backgroundColor = '#1E1E1E'; // Solid opaque brand-gray
+                el.classList.remove('border-brand-mint/50');
                 el.classList.add('border-white/5');
-                el.querySelector('.title-text')?.classList.remove('text-brand-neon');
+                el.querySelector('.title-text')?.classList.remove('text-brand-mint');
                 el.querySelector('.equalizer-overlay')?.remove();
             }
         });
@@ -1301,7 +1399,7 @@ function renderHostQueue() {
     const songs = currentQueueSnapshot.val();
     const sortedSongs = Object.keys(songs).map(key => ({
         key, ...songs[key]
-    })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+    })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.createdAt : b.createdAt));
 
     if (countEl) countEl.textContent = t('songs_count', { count: sortedSongs.length });
 
@@ -1447,13 +1545,13 @@ function renderHostQueue() {
         wrapper.classList.add('queue-item-wrapper');
 
         // 2. Song Item Styling
-        el.classList.remove('border-brand-neon/50', 'border-white/5', 'cursor-grab', 'active:cursor-grabbing');
+        el.classList.remove('border-brand-mint/50', 'border-white/5', 'cursor-grab', 'active:cursor-grabbing');
         if (isActive) {
-            el.classList.add('border-brand-neon/50');
-            el.style.backgroundColor = '#2a1f16';
+            el.classList.add('border-brand-mint/50');
+            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color (10% mint on dark)
         } else {
             el.classList.add('border-white/5');
-            el.style.backgroundColor = '#1E1E1E';
+            el.style.backgroundColor = '#1E1E1E'; // Solid opaque brand-gray
         }
         if (canControl) el.classList.add('cursor-grab', 'active:cursor-grabbing');
 
@@ -1468,8 +1566,8 @@ function renderHostQueue() {
                 </div>` : ''}
             </div>
             <div class="flex-1 min-w-0 pr-2">
-                <h4 class="title-text font-bold truncate text-sm ${isActive ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.title)}</h4>
-                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.requester)}</span></p>
+                <h4 class="title-text font-bold truncate text-sm ${isActive ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.title)}</h4>
+                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.requester)}</span></p>
             </div>
             <span class="duration-text text-xs text-gray-500 flex-shrink-0 hidden sm:block">${song.duration ? formatTime(song.duration) : '--:--'}</span>
         `;
@@ -1696,31 +1794,47 @@ window.addEventListener('orientationchange', () => {
     }
 });
 
-expandPlayerBtn.addEventListener('click', () => {
+// Open Full Player with animation
+const openFullPlayer = () => {
     setFullPlayerHeight();
-    fullPlayer.classList.remove('hidden', 'translate-y-full');
+    fullPlayer.classList.remove('hidden');
     fullPlayer.style.display = 'flex';
-    fullPlayer.style.transform = 'translateY(0)';
-    fullPlayer.style.webkitTransform = 'translateY(0)';
-    applyMarquee(); // Apply marquee when full player opens
-});
-collapsePlayerBtn.addEventListener('click', () => {
+
+    // Double RAF to ensure browser registers the display:flex state
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            fullPlayer.classList.remove('translate-y-full');
+            fullPlayer.style.transform = 'translateY(0)';
+            fullPlayer.style.webkitTransform = 'translateY(0)';
+            applyMarquee();
+        });
+    });
+};
+
+// Close Full Player with animation
+const closeFullPlayer = () => {
     fullPlayer.classList.add('translate-y-full');
     fullPlayer.style.transform = 'translateY(100%)';
     fullPlayer.style.webkitTransform = 'translateY(100%)';
+
     setTimeout(() => {
         fullPlayer.classList.add('hidden');
         fullPlayer.style.display = 'none';
-    }, 500); // Wait for transition
-});
-miniArt.parentElement.addEventListener('click', () => {
-    setFullPlayerHeight();
-    fullPlayer.classList.remove('hidden', 'translate-y-full');
-    fullPlayer.style.display = 'flex';
-    fullPlayer.style.transform = 'translateY(0)';
-    fullPlayer.style.webkitTransform = 'translateY(0)';
-    applyMarquee(); // Apply marquee when full player opens
-});
+        // Reset transform style to allow class-based control on next open
+        fullPlayer.style.transform = '';
+        fullPlayer.style.webkitTransform = '';
+        fullPlayer.classList.add('translate-y-full');
+    }, 500); // 500ms matches CSS duration
+};
+
+expandPlayerBtn.addEventListener('click', openFullPlayer);
+
+collapsePlayerBtn.addEventListener('click', closeFullPlayer);
+
+if (document.getElementById('mini-track-info')) {
+    document.getElementById('mini-track-info').addEventListener('click', openFullPlayer);
+}
+
 
 // Close Settings on outside click
 document.addEventListener('click', (e) => {
@@ -1746,12 +1860,13 @@ document.addEventListener('click', (e) => {
 });
 
 // Volume
-window.updateVolume = function (val) {
+let lastVolume = parseInt(localStorage.getItem('host_volume') || '50'); // Persist last non-zero volume
+
+const updateVolume = (val) => {
     let volume = parseInt(val);
     if (isNaN(volume)) volume = 50;
     volume = Math.max(0, Math.min(100, volume));
 
-    // Update player volume
     if (player && typeof player.setVolume === 'function') {
         try {
             player.setVolume(volume);
@@ -1759,46 +1874,60 @@ window.updateVolume = function (val) {
             console.warn('Failed to set volume:', e);
         }
     }
-    // Sync database
+    if (hostVolume) hostVolume.value = volume;
+    if (fullVolume) fullVolume.value = volume;
+    if (miniVolume) miniVolume.value = volume;
+
+    const hostVolumeFill = document.getElementById('host-volume-fill');
+    const fullVolumeFill = document.getElementById('full-volume-fill');
+    const miniVolumeFill = document.getElementById('mini-volume-fill');
+
+    if (hostVolumeFill) hostVolumeFill.style.width = `${volume}%`;
+    if (fullVolumeFill) fullVolumeFill.style.width = `${volume}%`;
+    if (miniVolumeFill) miniVolumeFill.style.width = `${volume}%`;
+
+    const isMuted = volume === 0;
+    document.getElementById('host-volume-icon')?.classList.toggle('hidden', isMuted);
+    document.getElementById('host-mute-icon')?.classList.toggle('hidden', !isMuted);
+    document.getElementById('full-volume-icon')?.classList.toggle('hidden', isMuted);
+    document.getElementById('full-mute-icon')?.classList.toggle('hidden', !isMuted);
+    document.getElementById('mini-volume-icon')?.classList.toggle('hidden', isMuted);
+    document.getElementById('mini-mute-icon')?.classList.toggle('hidden', !isMuted);
+
+    // Persist volume locally
+    localStorage.setItem('host_volume', volume);
+
+    // Update real-time DB
     if (roomId) {
         update(ref(db, `rooms/${roomId}/current_playback`), { volume: volume }).catch(e => console.warn(e));
     }
-    // Sync both slider values
-    const hVol = document.getElementById('host-volume');
-    const fVol = document.getElementById('full-volume');
-    if (hVol && hVol.value != volume) hVol.value = volume;
-    if (fVol && fVol.value != volume) fVol.value = volume;
+};
 
-    // Update fill elements
-    const hostVolumeFill = document.getElementById('host-volume-fill');
-    const fullVolumeFill = document.getElementById('full-volume-fill');
-    if (hostVolumeFill) hostVolumeFill.style.width = volume + '%';
-    if (fullVolumeFill) fullVolumeFill.style.width = volume + '%';
-
-    // Update mute icon
-    updateMuteIcon(volume);
+// Bind Volume Inputs
+if (hostVolume) {
+    hostVolume.addEventListener('input', (e) => updateVolume(e.target.value));
+}
+if (fullVolume) {
+    fullVolume.addEventListener('input', (e) => updateVolume(e.target.value));
+}
+if (miniVolume) {
+    miniVolume.addEventListener('input', (e) => updateVolume(e.target.value));
 }
 
-function updateMuteIcon(volume) {
-    const hostVolumeIcon = document.getElementById('host-volume-icon');
-    const hostMuteIcon = document.getElementById('host-mute-icon');
-    const fullVolumeIcon = document.getElementById('full-volume-icon');
-    const fullMuteIcon = document.getElementById('full-mute-icon');
-
-    if (volume > 0) {
-        hostVolumeIcon?.classList.remove('hidden');
-        hostMuteIcon?.classList.add('hidden');
-        fullVolumeIcon?.classList.remove('hidden');
-        fullMuteIcon?.classList.add('hidden');
+// Bind Mute Toggles
+const toggleMute = () => {
+    const currentVol = player.getVolume();
+    if (currentVol > 0) {
+        lastVolume = currentVol;
+        updateVolume(0);
     } else {
-        hostVolumeIcon?.classList.add('hidden');
-        hostMuteIcon?.classList.remove('hidden');
-        fullVolumeIcon?.classList.add('hidden');
-        fullMuteIcon?.classList.remove('hidden');
+        updateVolume(lastVolume || 50);
     }
-}
-hostVolume.addEventListener('input', (e) => updateVolume(e.target.value));
-fullVolume.addEventListener('input', (e) => updateVolume(e.target.value));
+};
+
+if (hostMuteToggle) hostMuteToggle.addEventListener('click', toggleMute);
+if (fullMuteToggle) fullMuteToggle.addEventListener('click', toggleMute);
+if (miniMuteToggle) miniMuteToggle.addEventListener('click', toggleMute);
 
 // Touch-to-seek for volume sliders (tap to set position)
 function handleSliderTouch(slider, updateFn) {
@@ -1813,58 +1942,11 @@ function handleSliderTouch(slider, updateFn) {
     slider.addEventListener('touchstart', setValueFromTouch, { passive: true });
     slider.addEventListener('touchmove', setValueFromTouch, { passive: true });
 }
-handleSliderTouch(hostVolume, updateVolume);
-handleSliderTouch(fullVolume, updateVolume);
+if (hostVolume) handleSliderTouch(hostVolume, updateVolume);
+if (fullVolume) handleSliderTouch(fullVolume, updateVolume);
+if (miniVolume) handleSliderTouch(miniVolume, updateVolume);
 
-// Mute Toggle
-let previousVolume = 100;
-const hostMuteToggle = document.getElementById('host-mute-toggle');
-const hostVolumeIcon = document.getElementById('host-volume-icon');
-const hostMuteIcon = document.getElementById('host-mute-icon');
 
-if (hostMuteToggle) {
-    hostMuteToggle.addEventListener('click', () => {
-        const currentVolume = hostVolume.value;
-        if (parseInt(currentVolume) > 0) {
-            // Mute
-            previousVolume = currentVolume;
-            if (player && typeof player.mute === 'function') player.mute();
-            updateVolume(0);
-            hostVolume.value = 0;
-            fullVolume.value = 0;
-            hostVolumeIcon?.classList.add('hidden');
-            hostMuteIcon?.classList.remove('hidden');
-        } else {
-            // Unmute
-            if (player && typeof player.unMute === 'function') player.unMute();
-            updateVolume(previousVolume);
-            hostVolume.value = previousVolume;
-            fullVolume.value = previousVolume;
-            hostVolumeIcon?.classList.remove('hidden');
-            hostMuteIcon?.classList.add('hidden');
-        }
-    });
-}
-
-// Fullscreen Mute Toggle
-const fullMuteToggle = document.getElementById('full-mute-toggle');
-if (fullMuteToggle) {
-    fullMuteToggle.addEventListener('click', () => {
-        const currentVolume = fullVolume.value;
-        if (parseInt(currentVolume) > 0) {
-            previousVolume = currentVolume;
-            if (player && typeof player.mute === 'function') player.mute();
-            updateVolume(0);
-            hostVolume.value = 0;
-            fullVolume.value = 0;
-        } else {
-            if (player && typeof player.unMute === 'function') player.unMute();
-            updateVolume(previousVolume);
-            hostVolume.value = previousVolume;
-            fullVolume.value = previousVolume;
-        }
-    });
-}
 
 // iOS Detection to hide volume controls (Volume/Mute not supported via JS on iOS)
 function isIOS() {
@@ -1921,20 +2003,26 @@ const toggleShuffle = async () => {
 };
 
 // Update shuffle button UI
-const updateShuffleUI = (isOn) => {
-    isShuffle = isOn;
-    if (isOn) {
-        miniShuffleBtn?.classList.add('text-brand-neon');
-        miniShuffleBtn?.classList.remove('text-gray-400');
-        fullShuffleBtn?.classList.add('text-brand-neon');
-        fullShuffleBtn?.classList.remove('text-gray-400');
-    } else {
-        miniShuffleBtn?.classList.remove('text-brand-neon');
-        miniShuffleBtn?.classList.add('text-gray-400');
-        fullShuffleBtn?.classList.remove('text-brand-neon');
-        fullShuffleBtn?.classList.add('text-gray-400');
+function updateShuffleUI(isOn) {
+    if (fullShuffleBtn) {
+        if (isOn) {
+            fullShuffleBtn.classList.add('text-brand-mint');
+            fullShuffleBtn.classList.remove('text-gray-400');
+        } else {
+            fullShuffleBtn.classList.add('text-gray-400');
+            fullShuffleBtn.classList.remove('text-brand-mint');
+        }
     }
-};
+    if (miniShuffleBtn) {
+        if (isOn) {
+            miniShuffleBtn.classList.add('text-brand-mint');
+            miniShuffleBtn.classList.remove('text-gray-400');
+        } else {
+            miniShuffleBtn.classList.add('text-gray-400');
+            miniShuffleBtn.classList.remove('text-brand-mint');
+        }
+    }
+}
 
 miniShuffleBtn.addEventListener('click', toggleShuffle);
 if (fullShuffleBtn) fullShuffleBtn.addEventListener('click', toggleShuffle);
@@ -1949,30 +2037,34 @@ const toggleRepeat = async () => {
 };
 
 // Update Repeat button UI
-const updateRepeatUI = (mode) => {
-    repeatMode = mode;
-    if (mode === 'one') {
-        miniRepeatBtn?.classList.add('text-brand-neon');
-        miniRepeatBtn?.classList.remove('text-gray-400', 'text-white');
-        miniRepeatIconAll?.classList.add('hidden');
-        miniRepeatIconOne?.classList.remove('hidden');
-
-        fullRepeatBtn?.classList.add('text-brand-neon');
-        fullRepeatBtn?.classList.remove('text-gray-400', 'text-white');
-        fullRepeatIconAll?.classList.add('hidden');
-        fullRepeatIconOne?.classList.remove('hidden');
-    } else {
-        miniRepeatBtn?.classList.remove('text-brand-neon');
-        miniRepeatBtn?.classList.add('text-gray-400');
-        miniRepeatIconAll?.classList.remove('hidden');
-        miniRepeatIconOne?.classList.add('hidden');
-
-        fullRepeatBtn?.classList.remove('text-brand-neon');
-        fullRepeatBtn?.classList.add('text-gray-400');
-        fullRepeatIconAll?.classList.remove('hidden');
-        fullRepeatIconOne?.classList.add('hidden');
+function updateRepeatUI(mode) {
+    if (fullRepeatBtn) {
+        if (mode !== 'all') { // 'one'
+            fullRepeatBtn.classList.add('text-brand-mint');
+            fullRepeatBtn.classList.remove('text-gray-400');
+            fullRepeatIconAll?.classList.add('hidden');
+            fullRepeatIconOne?.classList.remove('hidden');
+        } else {
+            fullRepeatBtn.classList.add('text-gray-400');
+            fullRepeatBtn.classList.remove('text-brand-mint');
+            fullRepeatIconAll?.classList.remove('hidden');
+            fullRepeatIconOne?.classList.add('hidden');
+        }
     }
-};
+    if (miniRepeatBtn) {
+        if (mode !== 'all') { // 'one' - but we treat 'off' as all for now? actually remote only has one/all
+            miniRepeatBtn.classList.add('text-brand-mint');
+            miniRepeatBtn.classList.remove('text-gray-400');
+            miniRepeatIconAll?.classList.add('hidden');
+            miniRepeatIconOne?.classList.remove('hidden');
+        } else {
+            miniRepeatBtn.classList.add('text-gray-400');
+            miniRepeatBtn.classList.remove('text-brand-mint');
+            miniRepeatIconAll?.classList.remove('hidden');
+            miniRepeatIconOne?.classList.add('hidden');
+        }
+    }
+}
 
 miniRepeatBtn?.addEventListener('click', toggleRepeat);
 fullRepeatBtn?.addEventListener('click', toggleRepeat);
@@ -2232,14 +2324,14 @@ function updateToggleUI(toggleBtn, isOn) {
     const knob = toggleBtn.querySelector('span');
     if (isOn) {
         toggleBtn.classList.remove('bg-gray-600');
-        toggleBtn.classList.add('bg-brand-neon');
+        toggleBtn.classList.add('bg-brand-mint');
         knob.style.transform = 'translateX(1.25rem)';
         // Only show last controller info for sharedControl
         if (toggleBtn.id === 'shared-control-toggle') {
             lastControllerInfo?.classList.remove('hidden');
         }
     } else {
-        toggleBtn.classList.remove('bg-brand-neon');
+        toggleBtn.classList.remove('bg-brand-mint');
         toggleBtn.classList.add('bg-gray-600');
         knob.style.transform = 'translateX(0)';
         if (toggleBtn.id === 'shared-control-toggle') {
@@ -2328,7 +2420,7 @@ async function performHostSearch(query, container, inputEl) {
                 <div class="flex-1 min-w-0">
                     <h4 class="text-sm font-bold truncate text-white">${vid.title}</h4>
                 </div>
-                <button class="bg-brand-neon text-black px-3 py-1 rounded text-xs font-bold">${t('add_button')}</button>
+                <button class="bg-brand-mint text-black px-3 py-1 rounded text-xs font-bold">${t('add_button')}</button>
             `;
             el.addEventListener('click', () => {
                 addToHostQueue(vid);
@@ -2429,10 +2521,10 @@ function showUpdateBanner(newVersion) {
     banner.className = 'update-banner top';
     banner.innerHTML = `
         <div class="flex-1 text-sm text-gray-200">
-            <span class="font-bold text-brand-neon">${t('update_available')}</span> 
+            <span class="font-bold text-brand-mint">${t('update_available')}</span> 
             ${t('update_desc', { version: newVersion })}
         </div>
-        <button id="refresh-app-btn" class="bg-brand-neon hover:bg-brand-neon/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
+        <button id="refresh-app-btn" class="bg-brand-mint hover:bg-brand-mint/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
             ${t('refresh')}
         </button>
     `;

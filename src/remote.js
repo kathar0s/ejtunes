@@ -32,6 +32,7 @@ const loginScreen = document.getElementById('login-screen');
 const roomSelectScreen = document.getElementById('room-select-screen');
 const appScreen = document.getElementById('app-screen');
 const appUserAvatar = document.getElementById('app-user-avatar');
+const hostBadge = document.getElementById('host-badge');
 const remoteVolume = document.getElementById('remote-volume');
 
 // Header Controls
@@ -321,12 +322,12 @@ function renderActiveRooms() {
         const el = document.createElement('div');
         el.className = 'bg-brand-gray p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/10 transition border border-white/5';
         el.innerHTML = `
-                <div class="w-12 h-12 bg-brand-neon/20 rounded-full flex items-center justify-center text-2xl">🎵</div>
+                <div class="w-12 h-12 bg-brand-mint/20 rounded-full flex items-center justify-center text-2xl">🎵</div>
                 <div class="flex-1 min-w-0">
                     <h3 class="font-bold truncate">${info.name || 'Unnamed Room'}</h3>
                     <p class="text-sm text-gray-400">${info.creatorName || 'Unknown'}</p>
                 </div>
-                <span class="text-brand-neon font-mono text-sm">${child.key}</span>
+                <span class="text-brand-mint font-mono text-sm">${child.key}</span>
             `;
         el.addEventListener('click', () => joinRoom(child.key));
         list.appendChild(el);
@@ -376,6 +377,15 @@ async function joinRoom(roomId) {
 
     document.getElementById('current-room-name').textContent = info.name || 'Room';
     document.getElementById('current-room-code').textContent = `#${roomId}`;
+
+    // Update Host Badge
+    if (hostBadge) {
+        if (currentUser && currentUser.uid === currentRoomCreatorId) {
+            hostBadge.classList.remove('hidden');
+        } else {
+            hostBadge.classList.add('hidden');
+        }
+    }
 
     // Helper to set creator name safely
     const setCreatorName = (name) => {
@@ -522,7 +532,7 @@ function initRoomListeners() {
 }
 
 // Volume Control with fill update
-const volumeFill = document.getElementById('volume-fill');
+const volumeFill = document.getElementById('remote-volume-fill');
 // Listener consolidated below (line ~1216)
 
 function updateRemoteMuteIcon(volume) {
@@ -580,10 +590,10 @@ const updateRemoteShuffleUI = (isOn) => {
     if (shuffleToggle) {
         if (isOn) {
             shuffleToggle.classList.remove('text-gray-500');
-            shuffleToggle.classList.add('text-brand-neon');
+            shuffleToggle.classList.add('text-brand-mint');
         } else {
             shuffleToggle.classList.add('text-gray-500');
-            shuffleToggle.classList.remove('text-brand-neon');
+            shuffleToggle.classList.remove('text-brand-mint');
         }
     }
 };
@@ -616,12 +626,12 @@ const updateRemoteRepeatUI = (mode) => {
     if (repeatToggle) {
         if (mode === 'one') {
             repeatToggle.classList.remove('text-gray-500');
-            repeatToggle.classList.add('text-brand-neon');
+            repeatToggle.classList.add('text-brand-mint');
             repeatIconAll?.classList.add('hidden');
             repeatIconOne?.classList.remove('hidden');
         } else {
             repeatToggle.classList.add('text-gray-500');
-            repeatToggle.classList.remove('text-brand-neon');
+            repeatToggle.classList.remove('text-brand-mint');
             repeatIconAll?.classList.remove('hidden');
             repeatIconOne?.classList.add('hidden');
         }
@@ -772,8 +782,9 @@ function updateQueueVisuals(data) {
 
         if (isPlaying) {
             el.classList.remove('bg-[#1E1E1E]', 'border-white/5');
-            el.classList.add('bg-[#2a1f16]', 'border-brand-neon/50');
-            el.querySelector('.title-text')?.classList.add('text-brand-neon');
+            el.classList.add('border-brand-mint/50');
+            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
+            el.querySelector('.title-text')?.classList.add('text-brand-mint');
 
             // Add equalizer overlay if not present
             if (thumbContainer && !thumbContainer.querySelector('.equalizer-overlay')) {
@@ -791,10 +802,11 @@ function updateQueueVisuals(data) {
             }
         } else {
             // Reset to default
-            el.classList.remove('bg-[#2a1f16]', 'border-brand-neon/50');
+            el.classList.remove('border-brand-mint/50');
             el.classList.add('bg-[#1E1E1E]', 'border-white/5');
+            el.style.backgroundColor = '';
 
-            el.querySelector('.title-text')?.classList.remove('text-brand-neon');
+            el.querySelector('.title-text')?.classList.remove('text-brand-mint');
             el.querySelector('.equalizer-overlay')?.remove();
         }
     });
@@ -820,16 +832,13 @@ function formatTime(seconds) {
 }
 
 function updateRemoteProgress() {
-    if (!currentSongData || currentStatus !== 'playing' || !currentSongData.startedAt || !currentSongData.duration) {
-        return;
-    }
-
+    if (!currentSongData || !currentSongData.duration || currentSongData.status !== 'playing' || isRemoteScrubbing) return;
     const elapsed = Math.floor((Date.now() - currentSongData.startedAt) / 1000);
     const duration = currentSongData.duration;
     const percent = Math.min((elapsed / duration) * 100, 100);
 
     if (remoteProgressFill) remoteProgressFill.style.width = `${percent}%`;
-    if (remoteProgressHandle) remoteProgressHandle.style.left = `calc(${percent}% - 6px)`;
+    if (remoteProgressHandle) remoteProgressHandle.style.left = `${percent}%`;
     if (remoteCurrentTime) remoteCurrentTime.textContent = formatTime(elapsed);
 }
 
@@ -864,7 +873,7 @@ function setRemoteProgressBar(data) {
         if (remoteTotalTime) remoteTotalTime.textContent = '0:00';
         if (remoteCurrentTime) remoteCurrentTime.textContent = '0:00';
         if (remoteProgressFill) remoteProgressFill.style.width = '0%';
-        if (remoteProgressHandle) remoteProgressHandle.style.left = '-6px';
+        if (remoteProgressHandle) remoteProgressHandle.style.left = '0%';
         stopRemoteProgressTimer();
         return;
     }
@@ -872,12 +881,12 @@ function setRemoteProgressBar(data) {
     if (remoteTotalTime) remoteTotalTime.textContent = formatTime(duration);
 
     // Calculate and show current position immediately (for both playing and paused)
-    if (data.startedAt) {
+    if (data.startedAt && !isRemoteScrubbing) {
         const elapsed = Math.floor((Date.now() - data.startedAt) / 1000);
         const clampedElapsed = Math.min(elapsed, duration);
         const percent = Math.min((clampedElapsed / duration) * 100, 100);
         if (remoteProgressFill) remoteProgressFill.style.width = `${percent}%`;
-        if (remoteProgressHandle) remoteProgressHandle.style.left = `calc(${percent}% - 6px)`;
+        if (remoteProgressHandle) remoteProgressHandle.style.left = `${percent}%`;
         if (remoteCurrentTime) remoteCurrentTime.textContent = formatTime(clampedElapsed);
     }
 
@@ -888,31 +897,92 @@ function setRemoteProgressBar(data) {
     }
 }
 
-// Seek on click
+// Seek & Scrubbing Handling
+let isRemoteScrubbing = false;
+
+const getRemoteSeekPercent = (e) => {
+    let clientX;
+    if (e.touches && e.touches.length > 0) clientX = e.touches[0].clientX;
+    else if (e.changedTouches && e.changedTouches.length > 0) clientX = e.changedTouches[0].clientX;
+    else clientX = e.clientX;
+
+    const rect = remoteProgressContainer.getBoundingClientRect();
+    const x = clientX - rect.left;
+    return Math.max(0, Math.min(1, x / rect.width));
+};
+
+const handleRemoteScrubVisuals = (e) => {
+    const percent = getRemoteSeekPercent(e);
+    const duration = currentSongData?.duration || 0;
+    const seekTime = Math.floor(percent * duration);
+
+    if (remoteProgressFill) {
+        remoteProgressFill.style.setProperty('transition', 'none', 'important');
+        remoteProgressFill.style.width = `${percent * 100}%`;
+    }
+    if (remoteProgressHandle) {
+        remoteProgressHandle.style.setProperty('transition', 'none', 'important');
+        remoteProgressHandle.style.left = `${percent * 100}%`;
+    }
+    if (remoteCurrentTime) remoteCurrentTime.textContent = formatTime(seekTime);
+};
+
 if (remoteProgressContainer) {
-    remoteProgressContainer.addEventListener('click', async (e) => {
-        // Silently ignore if user doesn't have control permission
+    const onScrubStart = (e) => {
+        // Only handle left click or touch
+        if (e.type === 'mousedown' && e.button !== 0) return;
+
+        if (!canControlRoom()) return;
+        isRemoteScrubbing = true;
+
+        // Prevent scrolling
+        if (e.cancelable) e.preventDefault();
+
+        handleRemoteScrubVisuals(e);
+    };
+
+    const onScrubMove = (e) => {
+        if (!isRemoteScrubbing) return;
+
+        // Prevent scrolling while scrubbing
+        if (e.cancelable) e.preventDefault();
+
+        handleRemoteScrubVisuals(e);
+    };
+
+    const onScrubEnd = async (e) => {
+        if (!isRemoteScrubbing && e.type !== 'click') return;
+        const wasScrubbing = isRemoteScrubbing;
+        isRemoteScrubbing = false;
+
         if (!canControlRoom()) return;
         if (!currentSongData || !currentSongData.duration || !currentRoomId) return;
 
-        const rect = remoteProgressContainer.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const percent = Math.max(0, Math.min(clickX / rect.width, 1));
+        const percent = getRemoteSeekPercent(e);
         const seekTime = Math.floor(percent * currentSongData.duration);
 
-        // Update startedAt to sync all hosts (same approach as Host seeking)
+        // Update startedAt to sync all hosts
         await update(ref(db, `rooms/${currentRoomId}/current_playback`), {
             startedAt: Date.now() - (seekTime * 1000)
         });
 
-        // Optimistic UI update
-        const newPercent = percent * 100;
-        if (remoteProgressFill) remoteProgressFill.style.width = `${newPercent}%`;
-        if (remoteProgressHandle) remoteProgressHandle.style.left = `calc(${newPercent}% - 6px)`;
-        if (remoteCurrentTime) remoteCurrentTime.textContent = formatTime(seekTime);
+        // Restore transitions
+        setTimeout(() => {
+            if (remoteProgressFill) remoteProgressFill.style.removeProperty('transition');
+            if (remoteProgressHandle) remoteProgressHandle.style.removeProperty('transition');
+        }, 100);
 
         updateLastController();
-    });
+    };
+
+    remoteProgressContainer.addEventListener('click', onScrubEnd);
+    remoteProgressContainer.addEventListener('mousedown', onScrubStart);
+    remoteProgressContainer.addEventListener('touchstart', onScrubStart, { passive: false });
+
+    window.addEventListener('mousemove', onScrubMove);
+    window.addEventListener('mouseup', onScrubEnd);
+    window.addEventListener('touchmove', onScrubMove, { passive: false });
+    window.addEventListener('touchend', onScrubEnd, { passive: false });
 }
 
 function renderQueue() {
@@ -1099,13 +1169,15 @@ function renderQueue() {
         wrapper.classList.add('queue-item-wrapper'); // Ensure class
 
         // 2. Styling
-        el.classList.remove('bg-[#1E1E1E]', 'bg-[#2a1f16]', 'border-white/5', 'border-brand-neon/50', 'cursor-grab', 'active:cursor-grabbing');
+        el.classList.remove('bg-[#1E1E1E]', 'bg-brand-mint/10', 'border-white/5', 'border-brand-mint/50', 'cursor-grab', 'active:cursor-grabbing');
         if (isActive) {
-            el.classList.add('bg-[#2a1f16]', 'border-brand-neon/50');
-            el.querySelector('.title-text')?.classList.add('text-brand-neon');
+            el.classList.add('border-brand-mint/50');
+            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
+            el.querySelector('.title-text')?.classList.add('text-brand-mint');
         } else {
             el.classList.add('bg-[#1E1E1E]', 'border-white/5');
-            el.querySelector('.title-text')?.classList.remove('text-brand-neon');
+            el.style.backgroundColor = '';
+            el.querySelector('.title-text')?.classList.remove('text-brand-mint');
         }
         if (canDrag) el.classList.add('cursor-grab', 'active:cursor-grabbing');
 
@@ -1128,8 +1200,8 @@ function renderQueue() {
                 </div>` : ''}
             </div>
             <div class="flex-1 min-w-0">
-                <h4 class="title-text text-sm font-bold truncate ${isActive ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.title)}</h4>
-                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-neon' : ''}">${decodeHtmlEntities(song.requester) || 'Anonymous'}</span></p>
+                <h4 class="title-text text-sm font-bold truncate ${isActive ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.title)}</h4>
+                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.requester) || 'Anonymous'}</span></p>
             </div>
             <div class="flex-shrink-0 text-right">
                 ${song.duration ? `<span class="duration-text text-xs text-gray-500">${formatDuration(song.duration)}</span>` : ''}
@@ -1603,10 +1675,10 @@ function showUpdateBanner(newVersion) {
     banner.className = 'update-banner bottom';
     banner.innerHTML = `
         <div class="flex-1 text-sm text-gray-200">
-            <span class="font-bold text-brand-neon">${t('update_available')}</span> 
+            <span class="font-bold text-brand-mint">${t('update_available')}</span> 
             <span class="text-xs opacity-70 block">${t('update_desc', { version: newVersion })}</span>
         </div>
-        <button id="refresh-app-btn" class="bg-brand-neon hover:bg-brand-neon/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
+        <button id="refresh-app-btn" class="bg-brand-mint hover:bg-brand-mint/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
             ${t('refresh')}
         </button>
     `;
