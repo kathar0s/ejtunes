@@ -27,7 +27,7 @@ let isShuffle = false;
 let repeatMode = 'all'; // 'all' or 'one'
 let mySessionId = null;
 let activeSessions = [];
-let isSharedControl = true; // Default to true until loaded
+let isSharedControl = false; // Default to false until loaded
 let currentSessionRef = null;
 
 function isAmILeader() {
@@ -133,7 +133,8 @@ function updateControlState() {
     // Volume sliders: control via container wrapper (not the input itself to preserve opacity:0)
     const volumeContainers = [
         hostVolume ? hostVolume.parentElement : null,
-        fullVolume ? fullVolume.parentElement : null
+        fullVolume ? fullVolume.parentElement : null,
+        miniVolume ? miniVolume.parentElement : null
     ];
     volumeContainers.forEach(container => {
         if (!container) return;
@@ -1970,6 +1971,9 @@ document.addEventListener('click', (e) => {
 let lastVolume = parseInt(localStorage.getItem('host_volume') || '50'); // Persist last non-zero volume
 
 const updateVolume = (val) => {
+    // Permission check
+    if (!isAmILeader() && !isSharedControl) return;
+
     let volume = parseInt(val);
     if (isNaN(volume)) volume = 50;
     volume = Math.max(0, Math.min(100, volume));
@@ -2023,6 +2027,9 @@ if (miniVolume) {
 
 // Bind Mute Toggles
 const toggleMute = () => {
+    // Permission check
+    if (!isAmILeader() && !isSharedControl) return;
+
     const currentVol = player.getVolume();
     if (currentVol > 0) {
         lastVolume = currentVol;
