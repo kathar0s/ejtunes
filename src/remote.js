@@ -423,40 +423,40 @@ async function joinRoom(roomId) {
     const updateAdminControlsVisibility = (sharedControl) => {
         sharedControlState = sharedControl === true; // Sync global state
 
-        // Check permission
-        const isAuthorized = currentUser && (currentUser.uid === currentRoomCreatorId || sharedControl === true);
-
-        // Elements to control
-        const volumeWrapper = document.getElementById('remote-volume-wrapper');
-        const prevBtn = document.getElementById('prev-btn');
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const nextBtn = document.getElementById('skip-btn');
-        const progressHandle = document.getElementById('remote-progress-handle');
-        const progressContainer = document.getElementById('remote-progress-container');
-        const progressWrapper = progressContainer ? progressContainer.closest('.group/prog') : null;
+        // Elements to control - ensure we have them
+        const volWrapper = document.getElementById('remote-volume-wrapper');
+        const pBtn = document.getElementById('prev-btn');
+        const ppBtn = document.getElementById('play-pause-btn');
+        const nBtn = document.getElementById('skip-btn');
+        const pHandle = document.getElementById('remote-progress-handle');
+        const pContainer = document.getElementById('remote-progress-container');
+        const pWrapper = pContainer ? pContainer.parentElement : null; // Use parent instead of complex selector
 
         // Admin controls section should always be visible now (to see shuffle/repeat)
         if (adminControls) adminControls.classList.remove('hidden');
 
+        // Check permission - handle potential null creator ID
+        const isAuthorized = !!(currentUser && (currentUser.uid === currentRoomCreatorId || sharedControl === true));
+
         if (isAuthorized) {
             // Authorized: Enable everything
-            if (volumeWrapper) volumeWrapper.classList.remove('hidden');
-            if (prevBtn) prevBtn.classList.remove('opacity-50', 'pointer-events-none');
-            if (playPauseBtn) playPauseBtn.classList.remove('opacity-50', 'pointer-events-none');
-            if (nextBtn) nextBtn.classList.remove('opacity-50', 'pointer-events-none');
-            if (progressHandle) progressHandle.classList.remove('hidden');
-            if (progressWrapper) progressWrapper.classList.remove('pointer-events-none');
-            if (progressContainer) progressContainer.classList.remove('cursor-default');
+            if (volWrapper) volWrapper.classList.remove('hidden');
+            if (pBtn) pBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (ppBtn) ppBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (nBtn) nBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (pHandle) pHandle.classList.remove('hidden');
+            if (pWrapper) pWrapper.classList.remove('pointer-events-none');
+            if (pContainer) pContainer.classList.remove('cursor-default');
             if (adminOverlay) adminOverlay.classList.add('hidden');
         } else {
             // Unauthorized: Granular disable
-            if (volumeWrapper) volumeWrapper.classList.add('hidden');
-            if (prevBtn) prevBtn.classList.add('opacity-50', 'pointer-events-none');
-            if (playPauseBtn) playPauseBtn.classList.add('opacity-50', 'pointer-events-none');
-            if (nextBtn) nextBtn.classList.add('opacity-50', 'pointer-events-none');
-            if (progressHandle) progressHandle.classList.add('hidden');
-            if (progressWrapper) progressWrapper.classList.add('pointer-events-none'); // Disable hover effects
-            if (progressContainer) progressContainer.classList.add('cursor-default');
+            if (volWrapper) volWrapper.classList.add('hidden');
+            if (pBtn) pBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (ppBtn) ppBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (nBtn) nBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (pHandle) pHandle.classList.add('hidden');
+            if (pWrapper) pWrapper.classList.add('pointer-events-none'); // Disable hover effects
+            if (pContainer) pContainer.classList.add('cursor-default');
             if (adminOverlay) adminOverlay.classList.add('hidden'); // We don't need the overlay anymore
         }
     };
