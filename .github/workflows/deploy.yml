@@ -25,6 +25,7 @@ jobs:
         run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_DATABASE_URL: ${{ github.ref == 'refs/heads/master' && 'https://ejtunes-prod-rtdb.asia-southeast1.firebasedatabase.app' || 'https://ejtunes-music-default-rtdb.asia-southeast1.firebasedatabase.app' }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
