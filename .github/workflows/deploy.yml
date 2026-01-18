@@ -29,13 +29,13 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_EJTUNE }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_EJTUNES_MUSIC }}'
           channelId: live
-          projectId: ejtune
+          projectId: ejtunes-music
 
       - name: Sync version to Firebase Database
         run: |
           npm install firebase-admin
           node scripts/sync-version.js
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EJTUNE }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EJTUNES_MUSIC }}
