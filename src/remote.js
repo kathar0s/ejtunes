@@ -428,6 +428,8 @@ async function joinRoom(roomId) {
         const pBtn = document.getElementById('prev-btn');
         const ppBtn = document.getElementById('play-pause-btn');
         const nBtn = document.getElementById('skip-btn');
+        const sToggle = document.getElementById('shuffle-toggle');
+        const rToggle = document.getElementById('repeat-toggle');
         const pHandle = document.getElementById('remote-progress-handle');
         const pContainer = document.getElementById('remote-progress-container');
         const pWrapper = pContainer ? pContainer.parentElement : null; // Use parent instead of complex selector
@@ -444,6 +446,8 @@ async function joinRoom(roomId) {
             if (pBtn) pBtn.classList.remove('opacity-50', 'pointer-events-none');
             if (ppBtn) ppBtn.classList.remove('opacity-50', 'pointer-events-none');
             if (nBtn) nBtn.classList.remove('opacity-50', 'pointer-events-none');
+            if (sToggle) sToggle.classList.remove('pointer-events-none');
+            if (rToggle) rToggle.classList.remove('pointer-events-none');
             if (pHandle) pHandle.classList.remove('hidden');
             if (pWrapper) pWrapper.classList.remove('pointer-events-none');
             if (pContainer) pContainer.classList.remove('cursor-default');
@@ -454,6 +458,8 @@ async function joinRoom(roomId) {
             if (pBtn) pBtn.classList.add('opacity-50', 'pointer-events-none');
             if (ppBtn) ppBtn.classList.add('opacity-50', 'pointer-events-none');
             if (nBtn) nBtn.classList.add('opacity-50', 'pointer-events-none');
+            if (sToggle) sToggle.classList.add('pointer-events-none');
+            if (rToggle) rToggle.classList.add('pointer-events-none');
             if (pHandle) pHandle.classList.add('hidden');
             if (pWrapper) pWrapper.classList.add('pointer-events-none'); // Disable hover effects
             if (pContainer) pContainer.classList.add('cursor-default');
