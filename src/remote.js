@@ -1084,7 +1084,7 @@ function renderQueue() {
         if (!currentSongData || !currentSongData.videoId) {
             list.innerHTML += `<div class="text-center text-gray-500 py-8 text-sm">${t('no_songs_queue')}</div>`;
         }
-        if (countEl) countEl.textContent = t('songs_count', { count: 0 });
+        if (countEl) countEl.textContent = t('playlist_summary', { count: 0, duration: '0:00' });
         return;
     }
 
@@ -1093,7 +1093,28 @@ function renderQueue() {
         key, ...songs[key]
     })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
 
-    if (countEl) countEl.textContent = t('songs_count', { count: sortedSongs.length });
+    // Calculate total duration
+    let totalSeconds = 0;
+    sortedSongs.forEach(s => {
+        if (s.duration) totalSeconds += s.duration;
+    });
+
+    const formatHHMMSS = (seconds) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if (h > 0) {
+            return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    if (countEl) {
+        countEl.textContent = t('playlist_summary', {
+            count: sortedSongs.length,
+            duration: formatHHMMSS(totalSeconds)
+        });
+    }
 
     // Remove any non-keyed elements (like "No songs" message)
     Array.from(list.children).forEach(child => {
