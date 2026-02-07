@@ -187,7 +187,7 @@
 
 
         <!-- YouTube Video Background / LP Center Video Layer -->
-        <div id="yt-player-wrapper" class="yt-bg-mode" style="display: none;">
+        <div id="yt-player-wrapper" class="yt-bg-mode">
             <div id="player"></div>
         </div>
 
@@ -268,12 +268,12 @@
                     <span class="text-sm text-gray-600 dark:text-gray-300" data-i18n="shared_control">Allow everyone
                         to
                         control</span>
-                    <button id="shared-control-toggle"
-                        class="relative w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors focus:outline-none"
-                        role="switch" aria-checked="false">
-                        <span
-                            class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"></span>
-                    </button>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="shared-control-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-mint transition-all duration-300
+                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                            peer-checked:after:translate-x-5"></div>
+                    </label>
                 </div>
 
                 <!-- Private Room Toggle -->
@@ -284,12 +284,12 @@
                         <span class="text-xs text-gray-500 block" data-i18n="private_room_hint">Hidden from public
                             list</span>
                     </div>
-                    <button id="private-room-toggle"
-                        class="relative w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors focus:outline-none"
-                        role="switch" aria-checked="false">
-                        <span
-                            class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"></span>
-                    </button>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="private-room-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-mint transition-all duration-300
+                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                            peer-checked:after:translate-x-5"></div>
+                    </label>
                 </div>
 
                 <!-- Theme Toggle -->
@@ -302,9 +302,10 @@
                         <input type="checkbox" id="host-theme-toggle" class="sr-only peer">
                         <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-mint transition-all duration-300
                             after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
-                            peer-checked:after:translate-x-5 peer-checked:after:bg-black"></div>
+                            peer-checked:after:translate-x-5"></div>
                     </label>
                 </div>
+
 
                 <!-- Last Controller Info (hidden by default) -->
                 <div id="last-controller-info" class="hidden mb-4 p-3 bg-brand-mint/10 rounded-lg text-left">

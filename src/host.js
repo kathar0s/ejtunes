@@ -254,6 +254,89 @@ const sharedControlToggle = document.getElementById('shared-control-toggle');
 const privateRoomToggle = document.getElementById('private-room-toggle');
 const lastControllerInfo = document.getElementById('last-controller-info');
 const lastControllerName = document.getElementById('last-controller-name');
+// State Management for PIP Mode
+let isPIPMode = false;
+
+const updatePIPPosition = (forceNoTransition = false, forcedPercent = null) => {
+    if (!ytPlayerWrapper || !ytPlayerWrapper.classList.contains('yt-pip-mode')) return;
+
+    let percent;
+    if (forcedPercent !== null) {
+        percent = forcedPercent;
+    } else {
+        if (!player || typeof player.getCurrentTime !== 'function' || typeof player.getDuration !== 'function') return;
+        const current = player.getCurrentTime();
+        const duration = player.getDuration();
+        if (duration <= 0) return;
+        percent = (current / duration) * 100;
+    }
+
+    if (forceNoTransition) {
+        ytPlayerWrapper.style.setProperty('transition', 'none', 'important');
+    }
+
+    const pipWidth = 160;
+    const miniProgressContainer = document.getElementById('mini-progress-container');
+    const containerWidth = miniProgressContainer ? miniProgressContainer.offsetWidth : 0;
+    if (containerWidth === 0) return;
+
+    const maxTranslate = Math.max(0, containerWidth - pipWidth);
+    let translateX = (percent / 100) * containerWidth - (pipWidth / 2);
+    translateX = Math.max(0, Math.min(translateX, maxTranslate));
+
+    ytPlayerWrapper.style.transform = `translateX(${translateX}px)`;
+
+    if (forceNoTransition) {
+        ytPlayerWrapper.offsetHeight; // Force reflow
+        setTimeout(() => {
+            ytPlayerWrapper.style.removeProperty('transition');
+        }, 100);
+    }
+};
+
+const switchPIPMode = (enabled, forceInstant = false) => {
+    if (!ytPlayerWrapper) return;
+    isPIPMode = enabled;
+
+    if (forceInstant) {
+        ytPlayerWrapper.style.setProperty('transition', 'none', 'important');
+    }
+
+    if (enabled) {
+        // Switch to PIP
+        ytPlayerWrapper.classList.remove('yt-bg-mode', 'yt-lp-mode');
+        ytPlayerWrapper.classList.add('yt-pip-mode');
+
+        // Use timeout to ensure closeFullPlayer doesn't conflict with transition start
+        const fullPlayer = document.getElementById('full-player');
+        if (fullPlayer && !fullPlayer.classList.contains('hidden')) {
+            // If full player is open, we close it
+            const collapseBtn = document.getElementById('collapse-player-btn');
+            if (collapseBtn) collapseBtn.click();
+        }
+
+        updatePIPPosition(true);
+    } else {
+        // Switch to Background
+        ytPlayerWrapper.classList.remove('yt-pip-mode');
+        ytPlayerWrapper.classList.add('yt-bg-mode');
+        ytPlayerWrapper.style.transform = '';
+
+        const fullPlayer = document.getElementById('full-player');
+        if (fullPlayer && fullPlayer.classList.contains('hidden')) {
+            // If full player is closed, we open it
+            const expandBtn = document.getElementById('expand-player-btn');
+            if (expandBtn) expandBtn.click();
+        }
+    }
+
+    if (forceInstant) {
+        ytPlayerWrapper.offsetHeight; // Force reflow
+        setTimeout(() => {
+            ytPlayerWrapper.style.removeProperty('transition');
+        }, 100);
+    }
+};
 
 // Immediate UI State Check to prevent FOUC (Flash of Unstyled Content / Setup Screen)
 (function () {
@@ -664,7 +747,8 @@ function createPlayer() {
         width: '640',
         host: 'https://www.youtube-nocookie.com',
         playerVars: {
-            'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1
+            'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1,
+            'modestbranding': 1, 'iv_load_policy': 3
         },
         events: {
             'onReady': onPlayerReady,
@@ -803,6 +887,9 @@ function resetProgressBar() {
     if (fullProgressHandle) fullProgressHandle.style.left = '0%';
     if (miniProgressHandle) miniProgressHandle.style.left = '0%';
     progCurrent.textContent = '0:00';
+
+    // Instant PIP jump to start
+    if (isPIPMode) updatePIPPosition(true, 0);
     requestAnimationFrame(() => {
         setTimeout(() => {
             progressBarMini.style.transition = '';
@@ -835,13 +922,18 @@ function startProgressLoop() {
                 fullProgressBar.style.width = `${percent}%`;
                 if (fullProgressHandle) fullProgressHandle.style.left = `${percent}%`;
                 if (miniProgressHandle) miniProgressHandle.style.left = `${percent}%`;
-                progCurrent.textContent = formatTime(current);
+                if (progCurrent) {
+                    progCurrent.textContent = formatTime(current);
+                }
+
+                // PIP Mode Horizontal Tracking
+                if (isPIPMode) updatePIPPosition();
             }
 
             // Duration should always be valid
             progDuration.textContent = formatTime(duration);
         }
-    }, 1000);
+    }, 500);
 }
 
 // Battery Optimization: Handle visibility change to pause/resume visuals
@@ -931,6 +1023,9 @@ const onSeekEnd = (e) => {
             if (fullProgressHandle) fullProgressHandle.style.left = `${finalPercent}%`;
             progCurrent.textContent = formatTime(seekTime);
 
+            // Instant PIP jump
+            if (isPIPMode) updatePIPPosition(true, finalPercent);
+
             // Restore transition after a short delay
             setTimeout(() => {
                 progressBarMini.style.removeProperty('transition');
@@ -970,7 +1065,7 @@ const getSeekPercent = (e, overrideElement = null) => {
     const rect = element.getBoundingClientRect();
     const x = clientX - rect.left;
     const width = rect.width;
-    return Math.max(0, Math.min(0.99, x / width)); // Cap at 99%
+    return Math.max(0, Math.min(1, x / width));
 };
 
 const handleScrubVisuals = (e) => {
@@ -989,6 +1084,9 @@ const handleScrubVisuals = (e) => {
         const duration = player.getDuration();
         progCurrent.textContent = formatTime(duration * percent);
     }
+
+    // Real-time PIP tracking during scrubbing
+    if (isPIPMode) updatePIPPosition(true, percent * 100);
 };
 
 
@@ -1979,12 +2077,15 @@ const openFullPlayer = () => {
     });
 
     // Switch YouTube player to LP center mode after slide-up animation
-    setTimeout(() => switchYTPlayerMode('lp'), 550);
+    setTimeout(() => {
+        switchPIPMode(false);
+        switchYTPlayerMode('lp');
+    }, 550);
 };
 
 // Close Full Player with animation
 const closeFullPlayer = () => {
-    switchYTPlayerMode('bg');
+    switchPIPMode(true);
     fullPlayer.classList.add('translate-y-full');
     fullPlayer.style.transform = 'translateY(100%)';
     fullPlayer.style.webkitTransform = 'translateY(100%)';
@@ -2462,44 +2563,36 @@ document.getElementById('delete-room-btn').addEventListener('click', async () =>
 function initRoomSettings() {
     if (!roomId) return;
 
-    // --- Shared Control Toggle ---
-    if (sharedControlToggle) {
-        // Listen for real-time updates
-        onValue(ref(db, `rooms/${roomId}/info/sharedControl`), (snapshot) => {
-            const isOn = snapshot.val() === true;
-            isSharedControl = isOn;
-            updateToggleUI(sharedControlToggle, isOn);
-            updateControlState();
-        });
+    // --- Shared Control ---
+    onValue(ref(db, `rooms/${roomId}/info/isSharedControl`), (snapshot) => {
+        isSharedControl = snapshot.val() === true;
+        updateToggleUI(sharedControlToggle, isSharedControl);
 
-        if (!sharedControlToggle.dataset.listenerAdded) {
+        if (sharedControlToggle && !sharedControlToggle.dataset.listenerAdded) {
             sharedControlToggle.dataset.listenerAdded = 'true';
-            sharedControlToggle.addEventListener('click', async () => {
-                const current = sharedControlToggle.getAttribute('aria-checked') === 'true';
-                const newVal = !current;
-                await update(ref(db, `rooms/${roomId}/info`), { sharedControl: newVal });
-                // updateToggleUI is handled by onValue listener
+            sharedControlToggle.addEventListener('change', async (e) => {
+                const current = e.target.checked;
+                await update(ref(db, `rooms/${roomId}/info`), { isSharedControl: current });
             });
         }
-    }
+    });
 
-    // --- Private Room Toggle ---
-    if (privateRoomToggle) {
-        // Listen for real-time updates
-        onValue(ref(db, `rooms/${roomId}/info/isPrivate`), (snapshot) => {
-            const isOn = snapshot.val() === true;
-            updateToggleUI(privateRoomToggle, isOn);
-        });
+    // --- Private Room ---
+    onValue(ref(db, `rooms/${roomId}/info/isPrivate`), (snapshot) => {
+        const isPrivate = snapshot.val() === true;
+        updateToggleUI(privateRoomToggle, isPrivate);
 
-        if (!privateRoomToggle.dataset.listenerAdded) {
+        if (privateRoomToggle && !privateRoomToggle.dataset.listenerAdded) {
             privateRoomToggle.dataset.listenerAdded = 'true';
-            privateRoomToggle.addEventListener('click', async () => {
-                const current = privateRoomToggle.getAttribute('aria-checked') === 'true';
-                const newVal = !current;
-                await update(ref(db, `rooms/${roomId}/info`), { isPrivate: newVal });
-                // updateToggleUI is handled by onValue listener
+            privateRoomToggle.addEventListener('change', async (e) => {
+                const current = e.target.checked;
+                await update(ref(db, `rooms/${roomId}/info`), { isPrivate: current });
             });
         }
+    });
+    // Initial PIP state based on player visibility
+    if (fullPlayer && fullPlayer.classList.contains('hidden')) {
+        switchPIPMode(true, true);
     }
 
     // --- Shuffle ---
@@ -2515,25 +2608,33 @@ function initRoomSettings() {
     });
 }
 
-function updateToggleUI(toggleBtn, isOn) {
-    if (!toggleBtn) return;
-    toggleBtn.setAttribute('aria-checked', isOn);
-    const knob = toggleBtn.querySelector('span');
-    if (isOn) {
-        toggleBtn.classList.remove('bg-gray-600');
-        toggleBtn.classList.add('bg-brand-mint');
-        knob.style.transform = 'translateX(1.25rem)';
-        // Only show last controller info for sharedControl
-        if (toggleBtn.id === 'shared-control-toggle') {
-            lastControllerInfo?.classList.remove('hidden');
-        }
+function updateToggleUI(toggleEl, isOn) {
+    if (!toggleEl) return;
+
+    // Support both old <button> and new <input type="checkbox"> structure
+    if (toggleEl.tagName === 'INPUT') {
+        toggleEl.checked = isOn;
     } else {
-        toggleBtn.classList.remove('bg-brand-mint');
-        toggleBtn.classList.add('bg-gray-600');
-        knob.style.transform = 'translateX(0)';
-        if (toggleBtn.id === 'shared-control-toggle') {
-            lastControllerInfo?.classList.add('hidden');
+        // Legacy button support (though the HTML is updated, we keep this for safety)
+        toggleEl.setAttribute('aria-checked', isOn);
+        const knob = toggleEl.querySelector('span');
+        if (knob) {
+            if (isOn) {
+                toggleEl.classList.remove('bg-gray-600');
+                toggleEl.classList.add('bg-brand-mint');
+                knob.style.transform = 'translateX(1.25rem)';
+            } else {
+                toggleEl.classList.remove('bg-brand-mint');
+                toggleEl.classList.add('bg-gray-600');
+                knob.style.transform = 'translateX(0)';
+            }
         }
+    }
+
+    // Feature specific side-effects
+    if (toggleEl.id === 'shared-control-toggle') {
+        if (isOn) lastControllerInfo?.classList.remove('hidden');
+        else lastControllerInfo?.classList.add('hidden');
     }
 }
 
