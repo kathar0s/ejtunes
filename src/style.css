@@ -365,37 +365,33 @@ input[type="range"]:active::-moz-range-thumb {
 
 /* Vinyl Record Texture & Effects */
 .lp-grooves {
-  background: repeating-radial-gradient(
-    circle at center,
-    #111 0,
-    #111 2px,
-    #181818 3px,
-    #111 4px
-  );
+  background: repeating-radial-gradient(circle at center,
+      #111 0,
+      #111 2px,
+      #181818 3px,
+      #111 4px);
   opacity: 0.8;
   mix-blend-mode: soft-light;
 }
 
 .lp-highlight {
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    rgba(255, 255, 255, 0.05) 45deg,
-    transparent 90deg,
-    rgba(255, 255, 255, 0.05) 135deg,
-    transparent 180deg,
-    rgba(255, 255, 255, 0.05) 225deg,
-    transparent 270deg,
-    rgba(255, 255, 255, 0.05) 315deg,
-    transparent 360deg
-  );
+  background: conic-gradient(from 0deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 255, 255, 0.05) 45deg,
+      transparent 90deg,
+      rgba(255, 255, 255, 0.05) 135deg,
+      transparent 180deg,
+      rgba(255, 255, 255, 0.05) 225deg,
+      transparent 270deg,
+      rgba(255, 255, 255, 0.05) 315deg,
+      transparent 360deg);
   pointer-events: none;
 }
 
 .lp-shadow {
-  box-shadow: 
-    inset 0 0 100px rgba(0,0,0,0.8),
-    0 20px 50px rgba(0,0,0,0.6);
+  box-shadow:
+    inset 0 0 100px rgba(0, 0, 0, 0.8),
+    0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
 /* YouTube Player Background - Playlist Mode */
@@ -437,6 +433,9 @@ input[type="range"]:active::-moz-range-thumb {
   -webkit-mask-image: -webkit-radial-gradient(circle, white, white);
   -webkit-box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
   box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+  /* Spin with LP */
+  -webkit-animation: spin-slow 20s linear infinite;
+  animation: spin-slow 20s linear infinite;
 }
 
 .yt-lp-mode #player {

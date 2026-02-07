@@ -1198,6 +1198,10 @@ function setVisuals(isPlaying) {
     const isVisible = fullPlayer && !fullPlayer.classList.contains('hidden');
     const state = (isPlaying && isVisible) ? 'running' : 'paused';
     lpContainer.style.animationPlayState = state;
+    // Sync video player rotation with LP
+    if (ytPlayerWrapper) {
+        ytPlayerWrapper.style.animationPlayState = state;
+    }
 
     if (isPlaying) {
         miniPlayIcon.classList.add('hidden');
