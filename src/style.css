@@ -410,31 +410,31 @@ input[type="range"]:active::-moz-range-thumb {
   pointer-events: none;
 }
 
-/* LP Scratches for realistic rotation feel - Very subtle */
+/* LP Scratches for realistic rotation feel */
 .lp-scratches {
   background:
-    repeating-linear-gradient(23deg,
+    repeating-linear-gradient(17deg,
       transparent 0px,
-      transparent 150px,
-      rgba(255, 255, 255, 0.003) 151px,
-      transparent 152px),
-    repeating-linear-gradient(67deg,
+      transparent 40px,
+      rgba(180, 180, 180, 0.15) 41px,
+      transparent 42px),
+    repeating-linear-gradient(73deg,
       transparent 0px,
-      transparent 200px,
-      rgba(255, 255, 255, 0.002) 201px,
-      transparent 202px),
-    repeating-linear-gradient(156deg,
+      transparent 70px,
+      rgba(160, 160, 160, 0.12) 71px,
+      transparent 72px),
+    repeating-linear-gradient(142deg,
       transparent 0px,
-      transparent 120px,
-      rgba(255, 255, 255, 0.004) 121px,
-      transparent 122px),
-    repeating-linear-gradient(287deg,
+      transparent 55px,
+      rgba(170, 170, 170, 0.10) 56px,
+      transparent 57px),
+    repeating-linear-gradient(251deg,
       transparent 0px,
-      transparent 180px,
-      rgba(255, 255, 255, 0.003) 181px,
-      transparent 182px);
+      transparent 85px,
+      rgba(150, 150, 150, 0.08) 86px,
+      transparent 87px);
+  mix-blend-mode: overlay;
   pointer-events: none;
-  opacity: 0.5;
 }
 
 .lp-shadow {
