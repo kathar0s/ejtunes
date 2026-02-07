@@ -366,12 +366,16 @@ input[type="range"]:active::-moz-range-thumb {
 /* Vinyl Record Texture & Effects */
 .lp-grooves {
   background: repeating-radial-gradient(circle at center,
-      #111 0,
-      #111 2px,
-      #181818 3px,
-      #111 4px);
-  opacity: 0.8;
-  mix-blend-mode: soft-light;
+      #1a1a1a 0,
+      #1a1a1a 1px,
+      #0d0d0d 2px,
+      #1a1a1a 3px,
+      #0a0a0a 4px,
+      #1a1a1a 5px,
+      #0d0d0d 6px,
+      #1a1a1a 7px,
+      #0a0a0a 8px);
+  opacity: 1;
 }
 
 .lp-highlight {
