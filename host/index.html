@@ -603,6 +603,9 @@
                         <!-- Base Disc Texture (나선홈/동심원 홈) -->
                         <div class="absolute inset-0 lp-grooves"></div>
 
+                        <!-- Random Scratches (회전감 강조) -->
+                        <div class="absolute inset-0 lp-scratches"></div>
+
                         <!-- Inner Groove Ring (도출구) - Ring around label -->
                         <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div class="w-[48%] h-[48%] rounded-full border-[3px] lg:border-[5px] border-[#1a1a1a]">
@@ -616,11 +619,16 @@
                                 <img id="full-art"
                                     src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                     class="w-full h-full object-cover opacity-90">
-                                <!-- Center Hole (가운뎃구멍) - Must be above video (z-51) -->
-                                <div class="absolute inset-0 flex items-center justify-center z-[52]">
-                                    <div
-                                        class="w-4 h-4 lg:w-5 lg:h-5 bg-white rounded-full shadow-inner border border-gray-300">
-                                    </div>
+                            </div>
+                        </div>
+
+                        <!-- Silver Center Spindle (실버 양각) - Above video (z-52) -->
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-[52]">
+                            <div class="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-gradient-to-br from-gray-200 via-white to-gray-400 shadow-lg border border-gray-300"
+                                style="box-shadow: 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.8), inset 0 -1px 2px rgba(0,0,0,0.2);">
+                                <!-- Inner ring -->
+                                <div
+                                    class="absolute inset-1 rounded-full bg-gradient-to-br from-gray-300 via-gray-100 to-gray-400 border border-gray-400/50">
                                 </div>
                             </div>
                         </div>

@@ -380,35 +380,65 @@ input[type="range"]:active::-moz-range-thumb {
 
 .lp-highlight {
   background: conic-gradient(from 0deg at 50% 50%,
-      /* 1st reflection - top right */
+      /* 1st reflection - top right (wider) */
       transparent 0deg,
-      transparent 30deg,
-      rgba(255, 255, 255, 0.03) 35deg,
-      rgba(255, 255, 255, 0.12) 45deg,
-      rgba(255, 255, 255, 0.03) 55deg,
-      transparent 60deg,
-      /* 2nd reflection - bottom right */
-      transparent 90deg,
-      transparent 120deg,
-      rgba(255, 255, 255, 0.02) 125deg,
-      rgba(255, 255, 255, 0.08) 135deg,
-      rgba(255, 255, 255, 0.02) 145deg,
+      transparent 25deg,
+      rgba(255, 255, 255, 0.02) 30deg,
+      rgba(255, 255, 255, 0.15) 45deg,
+      rgba(255, 255, 255, 0.08) 60deg,
+      rgba(255, 255, 255, 0.02) 70deg,
+      transparent 75deg,
+      /* 2nd reflection - bottom right (narrower) */
+      transparent 110deg,
+      rgba(255, 255, 255, 0.02) 120deg,
+      rgba(255, 255, 255, 0.06) 130deg,
+      rgba(255, 255, 255, 0.02) 140deg,
       transparent 150deg,
-      /* 3rd reflection - bottom left */
-      transparent 180deg,
-      transparent 210deg,
-      rgba(255, 255, 255, 0.03) 215deg,
+      /* 3rd reflection - bottom left (medium) */
+      transparent 200deg,
+      rgba(255, 255, 255, 0.02) 210deg,
       rgba(255, 255, 255, 0.10) 225deg,
-      rgba(255, 255, 255, 0.03) 235deg,
-      transparent 240deg,
-      /* 4th reflection - top left */
-      transparent 270deg,
-      transparent 300deg,
-      rgba(255, 255, 255, 0.02) 305deg,
-      rgba(255, 255, 255, 0.07) 315deg,
-      rgba(255, 255, 255, 0.02) 325deg,
-      transparent 330deg,
+      rgba(255, 255, 255, 0.04) 240deg,
+      transparent 250deg,
+      /* 4th reflection - top left (subtle) */
+      transparent 290deg,
+      rgba(255, 255, 255, 0.01) 305deg,
+      rgba(255, 255, 255, 0.05) 320deg,
+      rgba(255, 255, 255, 0.01) 335deg,
+      transparent 345deg,
       transparent 360deg);
+  pointer-events: none;
+}
+
+/* LP Scratches for realistic rotation feel */
+.lp-scratches {
+  background:
+    /* Random scratch lines */
+    repeating-linear-gradient(23deg,
+      transparent 0px,
+      transparent 80px,
+      rgba(255, 255, 255, 0.015) 81px,
+      transparent 82px),
+    repeating-linear-gradient(67deg,
+      transparent 0px,
+      transparent 120px,
+      rgba(255, 255, 255, 0.01) 121px,
+      transparent 122px),
+    repeating-linear-gradient(156deg,
+      transparent 0px,
+      transparent 60px,
+      rgba(255, 255, 255, 0.02) 61px,
+      transparent 62px),
+    repeating-linear-gradient(203deg,
+      transparent 0px,
+      transparent 100px,
+      rgba(255, 255, 255, 0.012) 101px,
+      transparent 102px),
+    repeating-linear-gradient(287deg,
+      transparent 0px,
+      transparent 90px,
+      rgba(255, 255, 255, 0.018) 91px,
+      transparent 92px);
   pointer-events: none;
 }
 
