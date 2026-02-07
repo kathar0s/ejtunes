@@ -410,36 +410,31 @@ input[type="range"]:active::-moz-range-thumb {
   pointer-events: none;
 }
 
-/* LP Scratches for realistic rotation feel */
+/* LP Scratches for realistic rotation feel - Very subtle */
 .lp-scratches {
   background:
-    /* Random scratch lines */
     repeating-linear-gradient(23deg,
       transparent 0px,
-      transparent 80px,
-      rgba(255, 255, 255, 0.015) 81px,
-      transparent 82px),
+      transparent 150px,
+      rgba(255, 255, 255, 0.003) 151px,
+      transparent 152px),
     repeating-linear-gradient(67deg,
       transparent 0px,
-      transparent 120px,
-      rgba(255, 255, 255, 0.01) 121px,
-      transparent 122px),
+      transparent 200px,
+      rgba(255, 255, 255, 0.002) 201px,
+      transparent 202px),
     repeating-linear-gradient(156deg,
       transparent 0px,
-      transparent 60px,
-      rgba(255, 255, 255, 0.02) 61px,
-      transparent 62px),
-    repeating-linear-gradient(203deg,
-      transparent 0px,
-      transparent 100px,
-      rgba(255, 255, 255, 0.012) 101px,
-      transparent 102px),
+      transparent 120px,
+      rgba(255, 255, 255, 0.004) 121px,
+      transparent 122px),
     repeating-linear-gradient(287deg,
       transparent 0px,
-      transparent 90px,
-      rgba(255, 255, 255, 0.018) 91px,
-      transparent 92px);
+      transparent 180px,
+      rgba(255, 255, 255, 0.003) 181px,
+      transparent 182px);
   pointer-events: none;
+  opacity: 0.5;
 }
 
 .lp-shadow {
