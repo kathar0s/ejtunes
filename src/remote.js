@@ -868,21 +868,44 @@ function updateQueueVisuals(data) {
     listItems.forEach(el => {
         const isPlaying = data && el.dataset.key === data.queueKey;
         const thumbContainer = el.querySelector('.thumb-container');
+        const titleText = el.querySelector('.title-text');
+        const metaText = el.querySelector('p');
+        const durationText = el.querySelector('.duration-text');
+        const dragHandle = el.querySelector('.drag-handle');
 
         if (isPlaying) {
-            el.classList.remove('bg-[#1E1E1E]', 'border-white/5');
-            el.classList.add('border-brand-mint/50');
-            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
-            el.querySelector('.title-text')?.classList.add('text-brand-mint');
+            // Remove all possible background and text color classes
+            el.classList.remove('bg-white', 'dark:bg-[#1E1E1E]', 'border-black/5', 'dark:border-white/5', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]');
+            el.style.backgroundColor = ''; // Remove hardcoded legacy color
 
-            // Add equalizer overlay if not present
+            // Add Active Classes - Consistent with renderQueue
+            el.classList.add('bg-brand-mint', 'dark:bg-[#222F2F]', 'border-transparent', 'dark:border-white/5');
+
+            // Text Color Updates for better contrast on active item
+            if (titleText) {
+                titleText.classList.remove('text-gray-900', 'dark:text-gray-100');
+                titleText.classList.add('text-white', 'dark:text-brand-mint');
+            }
+            if (metaText) {
+                metaText.classList.remove('text-gray-500', 'dark:text-gray-400');
+                metaText.classList.add('text-white/90', 'dark:text-gray-400');
+            }
+            if (durationText) {
+                durationText.classList.remove('text-gray-500', 'dark:text-gray-400');
+                durationText.classList.add('text-white/90', 'dark:text-gray-400');
+            }
+            if (dragHandle) {
+                dragHandle.classList.remove('text-gray-400', 'dark:text-gray-500');
+                dragHandle.classList.add('text-white/80', 'dark:text-gray-500');
+            }
+
+            // Equalizer Overlay
             if (thumbContainer && !thumbContainer.querySelector('.equalizer-overlay')) {
                 const overlay = document.createElement('div');
                 overlay.className = 'equalizer-overlay absolute inset-0 bg-black/60 flex items-center justify-center';
                 overlay.innerHTML = `<div class="equalizer-bar small ${isPaused ? 'paused' : ''}"><span></span><span></span><span></span></div>`;
                 thumbContainer.appendChild(overlay);
             } else if (thumbContainer) {
-                // Update paused class on existing equalizer
                 const eqBar = thumbContainer.querySelector('.equalizer-bar');
                 if (eqBar) {
                     if (isPaused) eqBar.classList.add('paused');
@@ -890,12 +913,28 @@ function updateQueueVisuals(data) {
                 }
             }
         } else {
-            // Reset to default
-            el.classList.remove('border-brand-mint/50');
-            el.classList.add('bg-[#1E1E1E]', 'border-white/5');
+            // Inactive - Reset to default
+            el.classList.remove('bg-brand-mint', 'dark:bg-[#222F2F]', 'border-transparent');
+            el.classList.add('bg-white', 'dark:bg-[#1E1E1E]', 'border-black/5', 'dark:border-white/5', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]');
             el.style.backgroundColor = '';
 
-            el.querySelector('.title-text')?.classList.remove('text-brand-mint');
+            if (titleText) {
+                titleText.classList.remove('text-white', 'dark:text-brand-mint');
+                titleText.classList.add('text-gray-900', 'dark:text-gray-100');
+            }
+            if (metaText) {
+                metaText.classList.remove('text-white/90');
+                metaText.classList.add('text-gray-500', 'dark:text-gray-400');
+            }
+            if (durationText) {
+                durationText.classList.remove('text-white/90');
+                durationText.classList.add('text-gray-500', 'dark:text-gray-400');
+            }
+            if (dragHandle) {
+                dragHandle.classList.remove('text-white/80');
+                dragHandle.classList.add('text-gray-400', 'dark:text-gray-500');
+            }
+
             el.querySelector('.equalizer-overlay')?.remove();
         }
     });
