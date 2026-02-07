@@ -213,21 +213,12 @@ onAuthStateChanged(auth, (user) => {
             if (popovers[key].email) popovers[key].email.textContent = user.email || '';
         });
 
-        // Check URL for room code
-        const path = window.location.pathname.substring(1);
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomFromQuery = urlParams.get('room');
-        const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
+        // Initialize Navigation
+        handleNavigation();
 
-        if (targetRoom) joinRoom(targetRoom);
-        else {
-            const redirectParams = new URLSearchParams(window.location.search);
-            if (redirectParams.get('redirect') === 'host') {
-                window.location.href = '/host';
-                return;
-            }
-            showRoomSelect();
-        }
+        window.addEventListener('popstate', () => {
+            handleNavigation();
+        });
 
         // Update text after login success
         updatePageText();
@@ -240,13 +231,26 @@ onAuthStateChanged(auth, (user) => {
 
 
 
-    } else {
-        // Not logged in: Redirect to login
-        if (!window.location.pathname.startsWith('/login')) {
-            window.location.href = '/login?redirect=participant';
-        }
     }
 });
+
+function handleNavigation() {
+    const path = window.location.pathname.substring(1);
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromQuery = urlParams.get('room');
+    const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
+
+    if (targetRoom) {
+        joinRoom(targetRoom);
+    } else {
+        const redirectParams = new URLSearchParams(window.location.search);
+        if (redirectParams.get('redirect') === 'host') {
+            window.location.href = '/host';
+            return;
+        }
+        showRoomSelect();
+    }
+}
 
 function showRoomSelect() {
     roomSelectScreen.classList.add('legacy-flex-center');
