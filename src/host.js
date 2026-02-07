@@ -2570,7 +2570,7 @@ async function performHostSearch(query, container, inputEl) {
         }
     }
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&topicId=/m/04rlf&key=${YOUTUBE_API_KEY}`;
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error('API Error');

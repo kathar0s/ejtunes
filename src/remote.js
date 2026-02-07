@@ -1575,7 +1575,7 @@ async function fetchVideoInfo(videoId) {
 async function performSearch(query) {
     searchResults.classList.remove('hidden');
     try {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&topicId=/m/04rlf&key=${YOUTUBE_API_KEY}`;
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
