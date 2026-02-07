@@ -379,23 +379,36 @@ input[type="range"]:active::-moz-range-thumb {
 }
 
 .lp-highlight {
-  background:
-    /* Main diagonal light reflection */
-    linear-gradient(135deg,
-      transparent 0%,
-      transparent 35%,
-      rgba(255, 255, 255, 0.08) 40%,
-      rgba(255, 255, 255, 0.15) 45%,
-      rgba(255, 255, 255, 0.08) 50%,
-      transparent 55%,
-      transparent 100%),
-    /* Secondary subtle reflection */
-    linear-gradient(-45deg,
-      transparent 0%,
-      transparent 60%,
-      rgba(255, 255, 255, 0.03) 70%,
-      transparent 80%,
-      transparent 100%);
+  background: conic-gradient(from 0deg at 50% 50%,
+      /* 1st reflection - top right */
+      transparent 0deg,
+      transparent 30deg,
+      rgba(255, 255, 255, 0.03) 35deg,
+      rgba(255, 255, 255, 0.12) 45deg,
+      rgba(255, 255, 255, 0.03) 55deg,
+      transparent 60deg,
+      /* 2nd reflection - bottom right */
+      transparent 90deg,
+      transparent 120deg,
+      rgba(255, 255, 255, 0.02) 125deg,
+      rgba(255, 255, 255, 0.08) 135deg,
+      rgba(255, 255, 255, 0.02) 145deg,
+      transparent 150deg,
+      /* 3rd reflection - bottom left */
+      transparent 180deg,
+      transparent 210deg,
+      rgba(255, 255, 255, 0.03) 215deg,
+      rgba(255, 255, 255, 0.10) 225deg,
+      rgba(255, 255, 255, 0.03) 235deg,
+      transparent 240deg,
+      /* 4th reflection - top left */
+      transparent 270deg,
+      transparent 300deg,
+      rgba(255, 255, 255, 0.02) 305deg,
+      rgba(255, 255, 255, 0.07) 315deg,
+      rgba(255, 255, 255, 0.02) 325deg,
+      transparent 330deg,
+      transparent 360deg);
   pointer-events: none;
 }
 
