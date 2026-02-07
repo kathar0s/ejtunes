@@ -238,10 +238,8 @@ function handleNavigation() {
     const path = window.location.pathname.substring(1);
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromQuery = urlParams.get('room');
-    const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
-
     if (targetRoom) {
-        joinRoom(targetRoom);
+        joinRoom(targetRoom, false); // Don't push state on initial load or popstate
     } else {
         const redirectParams = new URLSearchParams(window.location.search);
         if (redirectParams.get('redirect') === 'host') {
@@ -336,7 +334,7 @@ function renderActiveRooms() {
                 </div>
                 <span class="text-brand-mint font-mono text-xs opacity-60">${child.key}</span>
             `;
-        el.addEventListener('click', () => joinRoom(child.key));
+        el.addEventListener('click', () => joinRoom(child.key, true)); // Explicitly push state on click
         list.appendChild(el);
     });
 
@@ -355,7 +353,7 @@ document.getElementById('room-code-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') document.getElementById('join-room-btn').click();
 });
 
-async function joinRoom(roomId) {
+async function joinRoom(roomId, shouldPushState = true) {
     const roomRef = ref(db, `rooms/${roomId}/info`);
     const snapshot = await get(roomRef);
 
@@ -384,7 +382,9 @@ async function joinRoom(roomId) {
     currentRoomId = roomId;
     currentRoomCreatorId = info.createdBy;
 
-    window.history.pushState({}, '', `/${roomId}`);
+    if (shouldPushState) {
+        window.history.pushState({}, '', `/${roomId}`);
+    }
 
     loadingScreen.classList.add('hidden');
     loadingScreen.classList.remove('legacy-flex-center');
