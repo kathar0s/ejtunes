@@ -313,7 +313,7 @@ function renderActiveRooms() {
         const hasSong = !!currentPlayback.videoId;
         const songTitle = hasSong ? decodeHtmlEntities(currentPlayback.title) : (t('preparing_music') || '음악을 준비중입니다.');
 
-        el.className = 'bg-white/80 dark:bg-brand-gray p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/95 dark:hover:bg-white/10 transition border border-black/5 dark:border-white/5 shadow-sm';
+        el.className = 'bg-white/80 dark:bg-brand-gray p-4 rounded-xl flex items-center space-x-4 cursor-pointer hover:bg-white/95 dark:hover:bg-white/10 transition border border-black/5 dark:border-white/5 shadow-sm';
         el.innerHTML = `
                 <div class="w-12 h-12 flex-shrink-0 bg-black/5 dark:bg-white/5 rounded-lg overflow-hidden flex items-center justify-center text-brand-mint">
                     ${currentPlayback.thumbnail ?
@@ -326,7 +326,7 @@ function renderActiveRooms() {
             }
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-baseline gap-2 mb-0.5">
+                    <div class="flex items-baseline space-x-2 mb-0.5">
                         <h3 class="font-bold truncate text-gray-900 dark:text-white">${info.name || 'Unnamed Room'}</h3>
                         <span class="text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">${info.creatorName || 'Unknown'}</span>
                     </div>
