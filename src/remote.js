@@ -196,10 +196,10 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
 
-        // Bind Theme Toggle
         // Bind Theme Toggles
         themeManager.bindToggle('room-select-theme-toggle');
         themeManager.bindToggle('error-theme-toggle');
+        themeManager.bindToggle('remote-theme-toggle'); // Added for settings popover
 
 
         // Update generic avatars
@@ -235,8 +235,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function handleNavigation() {
-    const path = window.location.pathname.substring(1);
-    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromQuery = urlParams.get('room');
     const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
 
     if (targetRoom) {

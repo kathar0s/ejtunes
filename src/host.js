@@ -306,10 +306,10 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
 
-        // Bind Theme Toggle
         // Bind Theme Toggles
         themeManager.bindToggle('setup-theme-toggle');
         themeManager.bindToggle('error-theme-toggle');
+        themeManager.bindToggle('host-theme-toggle'); // Added for settings popover
 
         // Check for Room ID in URL path: /host/ROOM_ID
         const pathSegments = window.location.pathname.split('/');
