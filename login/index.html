@@ -3,11 +3,24 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('ejtunes_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EJTunes - Login</title>
     <link rel="stylesheet" href="../src/style.css">
     <link rel="icon" type="image/png" sizes="32x32" href="/light_32.png" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="32x32" href="/dark_32.png" media="(prefers-color-scheme: dark)">
+    <!-- Preload background images for smooth theme switching -->
+    <link rel="preload" as="image" href="/bg_light.jpeg">
+    <link rel="preload" as="image" href="/bg_dark.jpeg">
     <style>
         .legacy-flex-center {
             display: -webkit-box;
@@ -31,28 +44,34 @@
     <!-- Login Screen -->
     <!-- Login Screen -->
     <div id="login-screen"
-        class="fixed inset-0 z-50 bg-login-day dark:bg-login-night bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center transition-all duration-700">
+        class="fixed inset-0 z-50 bg-login-day dark:bg-login-dark bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center transition-all duration-700">
         <!-- Overlay for better text readability -->
-        <div class="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] transition-all duration-700">
+        <div class="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-blur-[2px] transition-all duration-700">
         </div>
 
         <!-- Theme Toggle Switch -->
-        <div
-            class="absolute top-6 right-6 z-30 flex items-center gap-3 bg-black/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
-            <span class="text-[10px] font-bold text-white/50 dark:text-gray-400">DAY</span>
-            <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="login-theme-toggle" class="sr-only peer">
-                <div class="w-12 h-6 bg-gray-400/30 rounded-full peer peer-checked:bg-white transition-all duration-300
-                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
-                    peer-checked:after:translate-x-6 peer-checked:after:bg-black"></div>
-            </label>
-            <span class="text-[10px] font-bold text-white/50 dark:text-gray-400">NIGHT</span>
-        </div>
+        <!-- Theme Toggle Switch -->
+        <label
+            class="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-white/60 dark:bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-black/10 dark:border-white/10 shadow-sm transition-all duration-300 scale-90 cursor-pointer">
+            <input type="checkbox" id="login-theme-toggle" class="sr-only peer">
+            <span
+                class="text-[10px] font-black tracking-wider transition-colors duration-300 text-gray-900 peer-checked:text-gray-500 peer-checked:opacity-50">DAY</span>
+            <div class="relative w-11 h-5 bg-gray-400/40 dark:bg-gray-700 rounded-full peer-checked:bg-brand-mint transition-all duration-300
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-sm
+                    peer-checked:after:translate-x-6"></div>
+            <span
+                class="text-[10px] font-black tracking-wider transition-colors duration-300 text-gray-400 opacity-40 peer-checked:text-white peer-checked:opacity-100">NIGHT</span>
+        </label>
 
         <div class="relative z-10 flex flex-col items-center">
-            <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-32 h-32 mb-6 object-contain drop-shadow-lg">
-            <h1 class="text-4xl font-bold mb-2 text-white drop-shadow-md" data-i18n="app_title">EJTunes</h1>
-            <p class="text-white/90 font-medium mb-8 text-lg drop-shadow-md" data-i18n="create_room_desc">Enjoy Jamming
+            <img src="/dark_icon_transparent.png" alt="EJTunes"
+                class="w-32 h-32 mb-6 object-contain drop-shadow-lg hidden dark:block">
+            <img src="/light_icon_transparent.png" alt="EJTunes"
+                class="w-32 h-32 mb-6 object-contain drop-shadow-lg block dark:hidden">
+            <h1 class="text-4xl font-bold mb-2 text-gray-900 dark:text-white drop-shadow-md" data-i18n="app_title">
+                EJTunes</h1>
+            <p class="text-gray-800 dark:text-white/90 font-medium mb-8 text-lg drop-shadow-md"
+                data-i18n="create_room_desc">Enjoy Jamming
                 Together</p>
             <button id="login-btn"
                 class="bg-white text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition">

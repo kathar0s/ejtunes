@@ -3,12 +3,25 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('ejtunes_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EJTunes</title>
     <link rel="stylesheet" href="./src/style.css">
     <!-- Modern PNG Favicons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/light_32.png" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="32x32" href="/dark_32.png" media="(prefers-color-scheme: dark)">
+    <!-- Preload background images for smooth theme switching -->
+    <link rel="preload" as="image" href="/bg_light.jpeg">
+    <link rel="preload" as="image" href="/bg_dark.jpeg">
     <link rel="icon" type="image/png" sizes="256x256" href="/light_256.png" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="256x256" href="/dark_256.png" media="(prefers-color-scheme: dark)">
 
@@ -37,22 +50,27 @@
     </style>
 </head>
 
-<body class="bg-black text-white min-h-screen">
+<body class="bg-brand-offwhite dark:bg-black text-gray-900 dark:text-white min-h-screen">
 
     <!-- Host Disconnected Modal -->
     <div id="host-disconnected-modal"
         class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-fade-in">
-        <div class="bg-gray-900 border border-white/10 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
-            <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-24 h-24 mb-6 object-contain">
-            <h3 class="text-2xl font-bold mb-2 text-white" data-i18n="host_disconnected_title">Connection Lost</h3>
-            <p class="text-gray-400 mb-8 leading-relaxed" data-i18n="host_disconnected_msg">The host has ended the
+        <div
+            class="bg-white dark:bg-gray-900 border border-black/10 dark:border-white/10 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+            <img src="/dark_icon_transparent.png" alt="EJTunes" class="w-24 h-24 mb-6 object-contain hidden dark:block">
+            <img src="/light_icon_transparent.png" alt="EJTunes"
+                class="w-24 h-24 mb-6 object-contain block dark:hidden">
+            <h3 class="text-2xl font-bold mb-2 text-gray-900 dark:text-white" data-i18n="host_disconnected_title">
+                Connection Lost</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed" data-i18n="host_disconnected_msg">The host
+                has ended the
                 session.</p>
             <div class="flex flex-col gap-3">
                 <button id="reconnect-btn"
-                    class="w-full py-3 bg-brand-mint text-black rounded-xl font-bold text-lg hover:scale-105 transition shadow-lg shadow-brand-mint/20"
+                    class="w-full py-3 bg-brand-mint text-white dark:text-black rounded-xl font-bold text-lg hover:scale-105 transition shadow-lg shadow-brand-mint/20"
                     data-i18n="reconnect">Reconnect</button>
                 <button id="return-home-btn"
-                    class="w-full py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-lg hover:bg-white/20 transition"
+                    class="w-full py-3 bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white border border-black/10 dark:border-white/20 rounded-xl font-bold text-lg hover:bg-black/10 dark:hover:bg-white/20 transition"
                     data-i18n="leave_room">Leave Room</button>
             </div>
         </div>
@@ -60,7 +78,7 @@
 
     <!-- Loading Screen (Initial State) -->
     <div id="loading-screen"
-        class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
+        class="fixed inset-0 z-50 bg-brand-offwhite dark:bg-black flex flex-col items-center justify-center p-6 w-full h-full legacy-flex-center">
         <div class="w-12 h-12 border-4 border-brand-mint border-t-transparent rounded-full animate-spin"></div>
     </div>
     <!-- Error Screen (Room Not Found) -->
@@ -70,7 +88,7 @@
         <div class="absolute inset-0 bg-login-day bg-cover bg-center bg-no-repeat transition-opacity duration-1000 z-0">
         </div>
         <div id="error-bg-night"
-            class="absolute inset-0 bg-login-night bg-cover bg-center bg-no-repeat opacity-0 dark:opacity-100 transition-opacity duration-1000 z-[1]">
+            class="absolute inset-0 bg-login-dark bg-cover bg-center bg-no-repeat opacity-0 dark:opacity-100 transition-opacity duration-1000 z-[1]">
         </div>
 
         <!-- Semi-transparent Overlay -->
@@ -113,10 +131,29 @@
 
 
     <!-- Room Select Screen (STRICTLY Hidden by default to prevent flickering) -->
-    <div id="room-select-screen" class="hidden fixed inset-0 z-40 bg-black flex flex-col p-4 sm:p-6 w-full h-full"
+    <div id="room-select-screen"
+        class="hidden fixed inset-0 z-40 bg-login-day dark:bg-login-dark bg-cover bg-center bg-no-repeat flex flex-col p-4 sm:p-6 w-full h-full transition-all duration-700"
         style="display: none;">
+        <!-- Overlay Layer -->
+        <div
+            class="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-blur-[2px] z-0 pointer-events-none transition-all duration-700">
+        </div>
+
+        <!-- Global Theme Toggle -->
+        <label
+            class="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-white/60 dark:bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-black/10 dark:border-white/10 shadow-sm transition-all duration-300 scale-90 cursor-pointer">
+            <input type="checkbox" id="room-select-theme-toggle" class="sr-only peer">
+            <span
+                class="text-[10px] font-black tracking-wider transition-colors duration-300 text-gray-900 peer-checked:text-gray-500 peer-checked:opacity-50">DAY</span>
+            <div class="relative w-11 h-5 bg-gray-400/40 dark:bg-gray-700 rounded-full peer-checked:bg-brand-mint transition-all duration-300
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-sm
+                    peer-checked:after:translate-x-6"></div>
+            <span
+                class="text-[10px] font-black tracking-wider transition-colors duration-300 text-gray-400 opacity-40 peer-checked:text-white peer-checked:opacity-100">NIGHT</span>
+        </label>
+
         <!-- Layout Wrapper -->
-        <div class="w-full max-w-lg flex flex-col h-full">
+        <div class="relative z-10 w-full max-w-lg flex flex-col h-full mx-auto">
             <header class="flex items-center justify-between mb-6 shrink-0">
                 <h1 class="text-xl font-bold" data-i18n="join_room">Select Room</h1>
                 <div class="flex items-center gap-3 relative">
@@ -133,28 +170,30 @@
 
                     <!-- Popovers (Inside relative container) -->
                     <div id="lang-popover-select"
-                        class="hidden absolute top-12 right-0 w-32 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] overflow-hidden">
-                        <button class="lang-option w-full px-4 py-2 hover:bg-white/10 text-left flex items-center gap-2"
+                        class="hidden absolute top-12 right-0 w-32 bg-white dark:bg-brand-gray border border-black/10 dark:border-white/10 rounded-xl shadow-2xl z-[100] overflow-hidden">
+                        <button
+                            class="lang-option w-full px-4 py-2 hover:bg-black/5 dark:hover:bg-white/10 text-left flex items-center gap-2"
                             data-lang="en">
                             <span class="text-xl">🇺🇸</span> English
                         </button>
-                        <button class="lang-option w-full px-4 py-2 hover:bg-white/10 text-left flex items-center gap-2"
+                        <button
+                            class="lang-option w-full px-4 py-2 hover:bg-black/5 dark:hover:bg-white/10 text-left flex items-center gap-2"
                             data-lang="ko">
                             <span class="text-xl">🇰🇷</span> 한국어
                         </button>
                     </div>
 
                     <div id="profile-popover-select"
-                        class="hidden absolute top-12 right-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-right transition-all">
+                        class="hidden absolute top-12 right-0 w-64 bg-white dark:bg-brand-gray border border-black/10 dark:border-white/10 rounded-xl shadow-2xl z-[100] p-4 transform origin-top-right transition-all">
                         <div class="flex flex-col items-center mb-4">
                             <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-mint mb-2">
                                 <img id="popover-avatar-select" src="" class="w-full h-full object-cover">
                             </div>
-                            <p id="popover-name-select" class="font-bold text-lg"></p>
-                            <p id="popover-email-select" class="text-xs text-gray-400"></p>
+                            <p id="popover-name-select" class="font-bold text-lg text-gray-900 dark:text-white"></p>
+                            <p id="popover-email-select" class="text-xs text-gray-500 dark:text-gray-400"></p>
                         </div>
                         <button id="logout-btn-popover-select"
-                            class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
+                            class="w-full py-2 text-white-500 dark:text-red-400 border border-red-500/30 dark:border-red-400/30 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-400/10 transition flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
@@ -170,17 +209,18 @@
                 <div class="flex gap-2">
                     <input type="text" id="room-code-input" placeholder="Enter room code"
                         data-i18n="room_code_placeholder"
-                        class="flex-1 min-w-0 bg-brand-gray border border-white/20 focus:border-brand-mint rounded-xl py-3 px-4 text-center uppercase tracking-widest font-mono outline-none transition"
+                        class="flex-1 min-w-0 bg-gray-100 dark:bg-brand-gray border border-black/10 dark:border-white/20 focus:border-brand-mint rounded-xl py-3 px-4 text-center uppercase tracking-widest font-mono outline-none transition text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         maxlength="6" autocomplete="off">
                     <button id="join-room-btn"
-                        class="bg-brand-mint text-black px-6 shrink-0 min-w-[80px] rounded-xl font-bold hover:bg-brand-mint/80 transition"
+                        class="bg-brand-mint text-white dark:text-black px-6 shrink-0 min-w-[80px] rounded-xl font-bold hover:bg-brand-mint/80 transition"
                         data-i18n="join">
                         Join
                     </button>
                 </div>
             </div>
 
-            <h2 class="text-sm text-gray-400 mb-3 shrink-0" data-i18n="active_rooms">Active Rooms</h2>
+            <h2 class="text-sm text-gray-500 dark:text-gray-400 mb-3 shrink-0" data-i18n="active_rooms">Active Rooms
+            </h2>
             <div id="room-list" class="flex-1 overflow-y-auto space-y-3 min-h-0">
                 <div class="text-center text-gray-500 py-8" data-i18n="no_active_rooms">Loading rooms...</div>
             </div>
@@ -188,8 +228,10 @@
     </div>
 
     <!-- App Screen -->
-    <div id="app-screen" class="hidden h-screen flex flex-col relative">
-        <header class="sticky top-0 z-[200] bg-black/95 backdrop-blur-md border-b border-white/10">
+    <div id="app-screen"
+        class="hidden h-screen flex flex-col relative bg-brand-offwhite dark:bg-black transition-all duration-700">
+        <header
+            class="sticky top-0 z-[200] bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-black/10 dark:border-white/10 transition-colors duration-300">
             <div class="relative px-4">
                 <!-- Main Header Row -->
                 <div class="flex items-center justify-between gap-1">
@@ -214,22 +256,23 @@
 
                             <!-- Combined Profile & Language Popover -->
                             <div id="profile-popover-app"
-                                class="hidden absolute top-14 left-0 w-64 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[150] p-4 transform origin-top-left transition-all animate-fade-in-up">
+                                class="hidden absolute top-14 left-0 w-64 bg-white dark:bg-brand-gray border border-black/10 dark:border-white/10 rounded-xl shadow-2xl z-[150] p-4 transform origin-top-left transition-all animate-fade-in-up">
                                 <div class="flex flex-col items-center mb-4">
                                     <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-brand-mint mb-2">
                                         <img id="popover-avatar-app" src="" class="w-full h-full object-cover">
                                     </div>
-                                    <p id="popover-name-app" class="font-bold text-lg"></p>
-                                    <p id="popover-email-app" class="text-xs text-gray-400"></p>
+                                    <p id="popover-name-app" class="font-bold text-lg text-gray-900 dark:text-white">
+                                    </p>
+                                    <p id="popover-email-app" class="text-xs text-gray-500 dark:text-gray-400"></p>
                                 </div>
 
                                 <!-- Language Selection inside Popover -->
-                                <div class="mb-4 border-t border-white/10 pt-4">
+                                <div class="mb-4 border-t border-black/10 dark:border-white/10 pt-4">
                                     <p class="text-xs text-gray-500 font-bold mb-2 uppercase" data-i18n="language">
                                         Language</p>
                                     <div class="relative">
                                         <select id="lang-select-app"
-                                            class="w-full appearance-none bg-white/5 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-brand-mint transition cursor-pointer">
+                                            class="w-full appearance-none bg-gray-100 dark:bg-white/5 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-brand-mint transition cursor-pointer">
                                             <option value="en" class="text-black">🇺🇸 English</option>
                                             <option value="ko" class="text-black">🇰🇷 한국어</option>
                                         </select>
@@ -242,6 +285,19 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Theme Toggle -->
+                                <label
+                                    class="mb-4 border-t border-black/10 dark:border-white/10 pt-4 flex items-center justify-between cursor-pointer group">
+                                    <input type="checkbox" id="remote-theme-toggle" class="sr-only peer">
+                                    <span
+                                        class="text-xs text-gray-500 font-bold uppercase transition-colors peer-checked:text-brand-mint"
+                                        data-i18n="dark_mode">Dark
+                                        Mode</span>
+                                    <div class="relative w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-mint transition-all duration-300
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                                        peer-checked:after:translate-x-5"></div>
+                                </label>
 
                                 <button id="logout-btn-popover-app"
                                     class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
@@ -266,15 +322,16 @@
                                 </div>
                             </button>
 
-                            <!-- Room Info Popover -->
                             <div id="room-info-popover"
-                                class="hidden absolute top-full mt-1 left-0 w-56 bg-brand-gray border border-white/10 rounded-xl shadow-2xl z-[110] p-3 transform origin-top-left transition-all animate-fade-in-up">
+                                class="hidden absolute top-full mt-1 left-0 w-56 bg-white dark:bg-brand-gray border border-black/10 dark:border-white/10 rounded-xl shadow-2xl z-[110] p-3 transform origin-top-left transition-all animate-fade-in-up">
                                 <div class="mb-3 px-1">
-                                    <p class="text-xs text-gray-400 uppercase font-bold mb-1">Created by</p>
-                                    <p id="current-room-creator" class="font-medium text-white truncate">Unknown</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold mb-1">Created
+                                        by</p>
+                                    <p id="current-room-creator"
+                                        class="font-medium text-gray-900 dark:text-white truncate">Unknown</p>
                                 </div>
                                 <button id="leave-room-btn"
-                                    class="w-full py-2 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition flex items-center justify-center gap-2">
+                                    class="w-full py-2 text-white-500 dark:text-red-400 border border-red-500/30 dark:border-red-400/30 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-400/10 transition flex items-center justify-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
@@ -289,7 +346,7 @@
                     <div class="flex items-center gap-3 shrink-0">
                         <!-- Search Trigger -->
                         <button id="header-search-trigger"
-                            class="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-full transition">
+                            class="p-2 text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -302,8 +359,9 @@
 
                 <!-- Search Overlay -->
                 <div id="header-search-overlay"
-                    class="hidden absolute inset-0 bg-brand-dark/95 backdrop-blur z-[60] flex items-center px-4 gap-3 animate-fade-in">
-                    <button id="header-search-back" class="p-2 -ml-2 text-gray-400 hover:text-white transition">
+                    class="hidden absolute inset-0 bg-white/95 dark:bg-brand-dark/95 backdrop-blur z-[60] flex items-center px-4 gap-3 animate-fade-in">
+                    <button id="header-search-back"
+                        class="p-2 -ml-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
@@ -312,13 +370,13 @@
                     <div class="flex-1 relative flex items-center">
                         <input type="text" id="search-input" placeholder="Paste YouTube URL or search..."
                             data-i18n="search_placeholder" autocomplete="off"
-                            class="w-full bg-white/10 border border-transparent focus:border-brand-mint rounded-full py-2 pl-4 pr-20 text-sm outline-none transition text-white placeholder-gray-400">
+                            class="w-full bg-gray-100 dark:bg-white/10 border border-transparent focus:border-brand-mint rounded-full py-2 pl-4 pr-20 text-sm outline-none transition text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400">
 
                         <!-- Actions Container -->
                         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                             <!-- Clear Button (Hidden by default) -->
                             <button id="remote-clear-search-btn"
-                                class="hidden text-gray-400 hover:text-white rounded-full p-1 mr-1">
+                                class="hidden text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-full p-1 mr-1">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M6 18L18 6M6 6l12 12"></path>
@@ -327,7 +385,7 @@
 
                             <!-- Submit Button -->
                             <button id="search-submit-btn"
-                                class="text-brand-mint hover:text-white p-1.5 rounded-full hover:bg-white/10 transition">
+                                class="text-brand-mint hover:text-gray-900 dark:hover:text-white p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -339,13 +397,13 @@
             </div>
 
             <div id="search-results"
-                class="hidden absolute left-0 right-0 top-full bg-brand-gray border-t border-white/10 max-h-[50vh] overflow-y-auto shadow-2xl z-[160]">
+                class="hidden absolute left-0 right-0 top-full bg-white dark:bg-brand-gray border-t border-black/10 dark:border-white/10 max-h-[50vh] overflow-y-auto shadow-2xl z-[160]">
             </div>
         </header>
 
         <main id="app-main" class="p-4 flex-1 flex flex-col space-y-6 overflow-hidden">
             <section id="remote-playback-section"
-                class="relative bg-gradient-to-br from-brand-gray to-gray-900 rounded-2xl p-4 border border-white/5">
+                class="relative bg-white dark:bg-gradient-to-br dark:from-brand-gray dark:to-gray-900 rounded-2xl p-4 border border-black/5 dark:border-white/5 shadow-xl dark:shadow-none transition-all">
                 <!-- Host Missing Overlay (Subtle, covers only playback area) -->
                 <div id="host-missing-overlay"
                     class="hidden absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-300 rounded-2xl">
@@ -370,14 +428,16 @@
                     <div class="flex-1 min-w-0">
                         <p class="text-xs text-brand-mint font-bold uppercase tracking-wider mb-1"
                             data-i18n="now_playing">Now Playing</p>
-                        <h2 id="np-title" class="font-bold text-lg truncate">No music playing</h2>
-                        <p id="np-requester" class="text-gray-400 text-sm truncate" data-i18n="add_song_msg">Add a song
+                        <h2 id="np-title" class="font-bold text-lg truncate text-gray-900 dark:text-white">No music
+                            playing</h2>
+                        <p id="np-requester" class="text-gray-500 dark:text-gray-400 text-sm truncate"
+                            data-i18n="add_song_msg">Add a song
                             to start</p>
                     </div>
                     <button id="like-btn"
-                        class="flex flex-col items-center p-2 rounded-xl hover:bg-white/10 transition">
+                        class="flex flex-col items-center p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition">
                         <span id="like-icon" class="text-2xl">🤍</span>
-                        <span id="like-count" class="text-xs text-gray-400">0</span>
+                        <span id="like-count" class="text-xs text-gray-500 dark:text-gray-400">0</span>
                     </button>
                 </div>
 
@@ -385,26 +445,28 @@
                 <div id="remote-progress-section" class="mt-3 px-1">
                     <div class="group/prog cursor-pointer">
                         <div id="remote-progress-container" class="relative w-full h-8 flex items-center group">
-                            <div class="relative w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <div
+                                class="relative w-full h-1.5 bg-gray-200 dark:bg-white/20 rounded-full overflow-hidden">
                                 <div id="remote-progress-fill"
                                     class="absolute left-0 top-0 h-full bg-brand-mint rounded-full pointer-events-none transition-all duration-300 ease-linear"
                                     style="width: 0%;"></div>
                             </div>
                             <div id="remote-progress-handle"
-                                class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none"
+                                class="slider-handle absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-brand-mint dark:bg-white rounded-full shadow-lg pointer-events-none"
                                 style="left: 0%;"></div>
                         </div>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-100 mt-1 select-none">
+                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-100 mt-1 select-none">
                         <span id="remote-current-time">0:00</span>
                         <span id="remote-total-time">0:00</span>
                     </div>
                 </div>
 
 
-                <div id="admin-controls" class="hidden mt-4 pt-4 border-t border-white/10 relative">
+                <div id="admin-controls"
+                    class="hidden mt-4 pt-4 border-t border-black/10 dark:border-white/10 relative">
                     <div id="admin-overlay"
-                        class="absolute inset-0 z-20 bg-black/20 backdrop-blur-[2.5px] flex items-center justify-center rounded-xl hidden cursor-not-allowed">
+                        class="absolute inset-0 z-20 bg-white/50 dark:bg-black/20 backdrop-blur-[2.5px] flex items-center justify-center rounded-xl hidden cursor-not-allowed">
                         <span
                             class="text-xs font-medium text-gray-400 bg-black/80 px-3 py-1.5 rounded-full select-none backdrop-blur-md border border-white/10"
                             data-i18n="host_control_only">
@@ -413,20 +475,22 @@
                     </div>
                     <!-- Playback Controls -->
                     <div class="flex items-center justify-center gap-1 xs:gap-4 sm:gap-6">
-                        <button id="shuffle-toggle" class="p-2 text-gray-500 hover:text-white transition"
+                        <button id="shuffle-toggle"
+                            class="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition"
                             title="Shuffle">
                             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                                 <path
                                     d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
                             </svg>
                         </button>
-                        <button id="prev-btn" class="p-3 text-white hover:text-brand-mint transition">
+                        <button id="prev-btn"
+                            class="p-3 text-gray-900 dark:text-white hover:text-brand-mint transition">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
                             </svg>
                         </button>
                         <button id="play-pause-btn"
-                            class="p-3 bg-white text-black rounded-full hover:scale-105 transition shadow-lg">
+                            class="p-3 bg-brand-dark dark:bg-white text-white dark:text-black rounded-full hover:scale-105 transition shadow-lg">
                             <svg id="remote-play-icon" class="w-6 h-6 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M8 5v14l11-7z" />
                             </svg>
@@ -434,12 +498,14 @@
                                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                             </svg>
                         </button>
-                        <button id="skip-btn" class="p-3 text-white hover:text-brand-mint transition">
+                        <button id="skip-btn"
+                            class="p-3 text-gray-900 dark:text-white hover:text-brand-mint transition">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                             </svg>
                         </button>
-                        <button id="repeat-toggle" class="p-2 text-gray-500 hover:text-white transition"
+                        <button id="repeat-toggle"
+                            class="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition"
                             title="Repeat Mode">
                             <svg id="repeat-icon-all" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v6z" />
@@ -453,7 +519,9 @@
 
                     <!-- Volume -->
                     <div id="remote-volume-wrapper" class="flex items-center gap-3 mt-4">
-                        <button id="mute-toggle" class="p-1 text-gray-400 hover:text-white transition" title="Mute">
+                        <button id="mute-toggle"
+                            class="p-1 text-gray-400 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
+                            title="Mute">
                             <svg id="volume-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                 <path
                                     d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
@@ -464,8 +532,9 @@
                             </svg>
                         </button>
                         <div class="flex-1 relative h-6 flex items-center group/vol">
-                            <div class="w-full h-1 bg-gray-600 rounded-full relative overflow-hidden">
-                                <div id="remote-volume-fill" class="absolute left-0 top-0 h-full bg-white rounded-full"
+                            <div class="w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full relative overflow-hidden">
+                                <div id="remote-volume-fill"
+                                    class="absolute left-0 top-0 h-full bg-brand-dark dark:bg-white rounded-full"
                                     style="width: 100%">
                                 </div>
                             </div>

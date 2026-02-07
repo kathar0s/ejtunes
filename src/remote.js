@@ -2,6 +2,7 @@ import { db, auth, provider } from './firebase-config';
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { ref, push, serverTimestamp, onValue, update, get, set, query, orderByChild, remove, off, increment } from "firebase/database";
 import { initLanguage, setLanguage, t, updatePageText } from './i18n';
+import { themeManager } from './theme-manager';
 import { decodeHtmlEntities, toast } from './utils';
 import Sortable from 'sortablejs';
 import { APP_VERSION } from './version';
@@ -195,6 +196,11 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
 
+        // Bind Theme Toggle
+        // Bind Theme Toggles
+        themeManager.bindToggle('room-select-theme-toggle');
+        themeManager.bindToggle('error-theme-toggle');
+
 
         // Update generic avatars
         document.getElementById('user-avatar').src = user.photoURL || '';
@@ -344,14 +350,7 @@ async function joinRoom(roomId) {
             errorScreen.classList.add('legacy-flex-center');
 
             // Sync toggle state with current theme
-            const themeToggle = document.getElementById('error-theme-toggle');
-            if (themeToggle) {
-                // Determine initial theme (system or current class)
-                const isDark = document.documentElement.classList.contains('dark') ||
-                    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (isDark) document.documentElement.classList.add('dark');
-                themeToggle.checked = isDark;
-            }
+            // Handled by bindToggle above
         }
         loadingScreen.classList.add('hidden');
         loadingScreen.classList.remove('legacy-flex-center');
@@ -1158,7 +1157,7 @@ function renderQueue() {
         wrapper.appendChild(deleteBg);
 
         const el = document.createElement('div');
-        el.className = 'song-item p-3 rounded-xl flex items-center gap-2 transition-transform border relative';
+        el.className = 'song-item p-3 rounded-xl flex items-center gap-2 transition-transform border relative bg-white dark:bg-[#1E1E1E] border-black/5 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#262626]';
         el.dataset.key = song.key;
         el.style.touchAction = 'pan-y';
         wrapper.appendChild(el);
@@ -1283,15 +1282,16 @@ function renderQueue() {
         wrapper.classList.add('queue-item-wrapper'); // Ensure class
 
         // 2. Styling
-        el.classList.remove('bg-[#1E1E1E]', 'bg-brand-mint/10', 'border-white/5', 'border-brand-mint/50', 'cursor-grab', 'active:cursor-grabbing');
+        // Explicitly remove all potential background classes to prevent stacking contexts or bleed
+        el.classList.remove('bg-[#1E1E1E]', 'bg-brand-mint/10', 'border-white/5', 'border-brand-mint/50', 'cursor-grab', 'active:cursor-grabbing', 'bg-white', 'dark:bg-[#1E1E1E]', 'dark:bg-[#222F2F]', 'hover:bg-black/5', 'dark:hover:bg-white/10', 'bg-[#EBFBF0]', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]', 'bg-brand-mint', 'bg-[#222F2F]', 'bg-gray-800', 'bg-gray-900');
+        el.style.removeProperty('background-color');
+
         if (isActive) {
-            el.classList.add('border-brand-mint/50');
-            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
-            el.querySelector('.title-text')?.classList.add('text-brand-mint');
+            el.classList.add('bg-brand-mint', 'dark:bg-[#222F2F]', 'border-transparent', 'dark:border-white/5');
+            // NO hover classes for active item to prevent gray overlay
         } else {
-            el.classList.add('bg-[#1E1E1E]', 'border-white/5');
-            el.style.backgroundColor = '';
-            el.querySelector('.title-text')?.classList.remove('text-brand-mint');
+            el.classList.add('bg-white', 'dark:bg-[#1E1E1E]', 'border-black/5', 'dark:border-white/5', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]');
+            el.classList.remove('bg-brand-mint', 'text-white', 'border-transparent');
         }
         if (canDrag) el.classList.add('cursor-grab', 'active:cursor-grabbing');
 
@@ -1303,22 +1303,40 @@ function renderQueue() {
         // 4. Content
         // We replace innerHTML to ensure consistency
         const isPaused = currentStatus !== 'playing';
+        const isHost = song.requesterId === currentRoomCreatorId;
+        let requesterDisplay = decodeHtmlEntities(song.requester);
+        if (isHost && !requesterDisplay.includes('(Host)')) {
+            requesterDisplay += ' (Host)';
+        }
+
+        // TEXT COLOR LOGIC FOR MINT BG
+        const titleClass = isActive ? 'text-white dark:text-brand-mint' : 'text-gray-900 dark:text-gray-100';
+        const metaClass = isActive ? 'text-white/90 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400';
+        const highlightClass = isMySong ? (isActive ? 'text-white font-bold dark:text-brand-mint' : 'text-brand-mint') : '';
+        const dragHandleClass = isActive ? 'text-white/80 dark:text-gray-500' : 'text-gray-400 dark:text-gray-500';
 
         el.innerHTML = `
-            ${canDrag ? '<div class="w-6 text-gray-500 text-center drag-handle cursor-grab">≡</div>' : ''}
-            <div class="thumb-container w-12 h-12 rounded-lg overflow-hidden relative flex-shrink-0">
-                <img src="${song.thumbnail || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" class="w-full h-full object-cover">
-                 ${isActive ? `
+            ${canDrag ? `<div class="w-6 ${dragHandleClass} text-center drag-handle cursor-grab shrink-0">≡</div>` : ''}
+            
+            <div class="thumb-container relative w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-white/5 border border-white/10 group">
+               <img src="${song.thumbnail}" class="w-full h-full object-cover">
+               ${isActive ? `
                 <div class="equalizer-overlay absolute inset-0 bg-black/60 flex items-center justify-center">
                     <div class="equalizer-bar small ${isPaused ? 'paused' : ''}"><span></span><span></span><span></span></div>
                 </div>` : ''}
             </div>
-            <div class="flex-1 min-w-0">
-                <h4 class="title-text text-sm font-bold truncate ${isActive ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.title)}</h4>
-                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.requester) || 'Anonymous'}</span></p>
+            
+            <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
+                <h4 class="title-text font-bold truncate text-sm sm:text-base leading-tight ${titleClass}">
+                    ${decodeHtmlEntities(song.title)}
+                </h4>
+                <p class="text-xs sm:text-sm ${metaClass} truncate mt-0.5">
+                    ${decodeHtmlEntities(song.artist)} | <span class="${highlightClass}">${requesterDisplay}</span>
+                </p>
             </div>
-            <div class="flex-shrink-0 text-right">
-                ${song.duration ? `<span class="duration-text text-xs text-gray-500">${formatDuration(song.duration)}</span>` : ''}
+
+            <div class="shrink-0 text-right flex flex-col items-end justify-center">
+                ${song.duration ? `<span class="duration-text font-mono text-xs ${metaClass}">${formatDuration(song.duration)}</span>` : ''}
             </div>
         `;
 
@@ -1500,7 +1518,7 @@ async function fetchVideoInfo(videoId) {
 async function performSearch(query) {
     searchResults.classList.remove('hidden');
     try {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
@@ -1549,8 +1567,8 @@ function displaySearchResults(results) {
                 <img src="${video.thumb}" class="w-full h-full object-cover">
             </div>
             <div class="flex-1 min-w-0">
-                <h4 class="font-bold text-sm truncate text-white">${video.title}</h4>
-                <p class="text-xs text-gray-400 truncate">${video.artist}</p>
+                <h4 class="font-bold text-sm truncate text-gray-900 dark:text-white">${video.title}</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${video.artist}</p>
             </div>
         `;
 

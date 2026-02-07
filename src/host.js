@@ -5,6 +5,7 @@ import { ref, onValue, set, push, remove, query, orderByChild, equalTo, limitToF
 // ... imports ...
 import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 import { initLanguage, setLanguage, t, updatePageText } from './i18n';
+import { themeManager } from './theme-manager';
 import { toast, decodeHtmlEntities, getHighResThumbnail } from './utils';
 import Sortable from 'sortablejs';
 import QRCode from 'qrcode';
@@ -200,6 +201,7 @@ const progressBarMini = document.getElementById('progress-bar-mini');
 const bgArt = document.getElementById('bg-art');
 const fullArt = document.getElementById('full-art');
 const lpContainer = document.getElementById('lp-art-container');
+const ytPlayerWrapper = document.getElementById('yt-player-wrapper');
 const fullTitle = document.getElementById('full-title');
 const fullArtist = document.getElementById('full-artist');
 const fullRequester = document.getElementById('full-requester');
@@ -270,6 +272,11 @@ const lastControllerName = document.getElementById('last-controller-name');
     }
 })();
 
+// Handle browser back/forward button - reload to reset room state cleanly
+window.addEventListener('popstate', () => {
+    window.location.reload();
+});
+
 // Close search overlay when clicking outside
 document.addEventListener('click', (e) => {
     if (!searchOverlay || searchOverlay.classList.contains('hidden')) return;
@@ -298,6 +305,11 @@ updateLangDisplay();
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
+
+        // Bind Theme Toggle
+        // Bind Theme Toggles
+        themeManager.bindToggle('setup-theme-toggle');
+        themeManager.bindToggle('error-theme-toggle');
 
         // Check for Room ID in URL path: /host/ROOM_ID
         const pathSegments = window.location.pathname.split('/');
@@ -329,13 +341,7 @@ onAuthStateChanged(auth, async (user) => {
                         errorScreen.classList.remove('hidden');
 
                         // Sync toggle state with current theme
-                        const themeToggle = document.getElementById('error-theme-toggle');
-                        if (themeToggle) {
-                            const isDark = document.documentElement.classList.contains('dark') ||
-                                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                            if (isDark) document.documentElement.classList.add('dark');
-                            themeToggle.checked = isDark;
-                        }
+                        // Handled by content bind above
                     }
                     const setup = document.getElementById('setup-screen');
                     if (setup) setup.classList.add('hidden');
@@ -654,8 +660,8 @@ function initYouTubePlayer() {
 
 function createPlayer() {
     player = new YT.Player('player', {
-        height: '1',
-        width: '1',
+        height: '360',
+        width: '640',
         host: 'https://www.youtube-nocookie.com',
         playerVars: {
             'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1
@@ -670,6 +676,7 @@ function createPlayer() {
 
 function onPlayerReady() {
     isPlayerReady = true;
+    if (ytPlayerWrapper) ytPlayerWrapper.style.display = '';
     initListeners();
     startProgressLoop();
 }
@@ -1159,6 +1166,33 @@ function loadAndPlay(videoId, startSeconds = 0) {
     }, 200);
 }
 
+// YouTube Player Position Management
+function switchYTPlayerMode(mode) {
+    if (!ytPlayerWrapper) return;
+
+    if (mode === 'lp') {
+        const lpOuter = lpContainer ? lpContainer.parentElement : null;
+        if (!lpOuter) return;
+
+        const rect = lpOuter.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const diameter = rect.width * 0.40;
+
+        ytPlayerWrapper.className = 'yt-lp-mode';
+        ytPlayerWrapper.style.width = diameter + 'px';
+        ytPlayerWrapper.style.height = diameter + 'px';
+        ytPlayerWrapper.style.left = (centerX - diameter / 2) + 'px';
+        ytPlayerWrapper.style.top = (centerY - diameter / 2) + 'px';
+    } else {
+        ytPlayerWrapper.className = 'yt-bg-mode';
+        ytPlayerWrapper.style.width = '';
+        ytPlayerWrapper.style.height = '';
+        ytPlayerWrapper.style.left = '';
+        ytPlayerWrapper.style.top = '';
+    }
+}
+
 function setVisuals(isPlaying) {
     // Optimization: Only animate if playing AND full player is visible
     const isVisible = fullPlayer && !fullPlayer.classList.contains('hidden');
@@ -1371,44 +1405,6 @@ function initListeners() {
 
         // Re-render queue to update active song highlighting
         renderHostQueue();
-
-        const listItems = document.querySelectorAll('.song-item');
-        const isPaused = data.status !== 'playing';
-
-        listItems.forEach(el => {
-            const isPlaying = el.dataset.key === data.queueKey;
-            const thumbContainer = el.querySelector('.thumb-container');
-
-            if (isPlaying) {
-                el.classList.remove('hover:bg-white/10');
-                el.classList.add('border-brand-mint/50');
-                el.style.backgroundColor = '#222F2F'; // Solid opaque blended color
-                el.classList.remove('border-white/5');
-                el.querySelector('.title-text')?.classList.add('text-brand-mint');
-
-                // Add equalizer overlay if not present
-                if (thumbContainer && !thumbContainer.querySelector('.equalizer-overlay')) {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'equalizer-overlay absolute inset-0 bg-black/60 flex items-center justify-center';
-                    overlay.innerHTML = `<div class="equalizer-bar ${isPaused ? 'paused' : ''}"><span></span><span></span><span></span></div>`;
-                    thumbContainer.appendChild(overlay);
-                } else if (thumbContainer) {
-                    // Update paused class on existing equalizer
-                    const eqBar = thumbContainer.querySelector('.equalizer-bar');
-                    if (eqBar) {
-                        if (isPaused) eqBar.classList.add('paused');
-                        else eqBar.classList.remove('paused');
-                    }
-                }
-            } else {
-                el.classList.add('hover:bg-white/10');
-                el.style.backgroundColor = '#1E1E1E'; // Solid opaque brand-gray
-                el.classList.remove('border-brand-mint/50');
-                el.classList.add('border-white/5');
-                el.querySelector('.title-text')?.classList.remove('text-brand-mint');
-                el.querySelector('.equalizer-overlay')?.remove();
-            }
-        });
     });
 
     const queueRef = ref(db, `rooms/${roomId}/queue`);
@@ -1554,7 +1550,7 @@ function renderHostQueue() {
 
         // Song item (swipeable) - needs solid background to cover red delete bg
         const el = document.createElement('div');
-        el.className = 'song-item p-3 rounded-xl flex items-center gap-2 transition-transform border relative';
+        el.className = 'song-item p-3 rounded-xl flex items-center gap-2 transition-transform border relative bg-white dark:bg-[#1E1E1E] border-black/5 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#262626]';
         el.dataset.key = song.key;
         el.style.touchAction = 'pan-y';
 
@@ -1666,30 +1662,44 @@ function renderHostQueue() {
 
         // 2. Song Item Styling
         el.classList.remove('border-brand-mint/50', 'border-white/5', 'cursor-grab', 'active:cursor-grabbing');
+        el.style.removeProperty('background-color'); // Remove inline style
         if (isActive) {
-            el.classList.add('border-brand-mint/50');
-            el.style.backgroundColor = '#222F2F'; // Solid opaque blended color (10% mint on dark)
+            el.classList.add('bg-brand-mint', 'dark:bg-[#222F2F]', 'border-transparent', 'dark:border-white/5');
+            el.classList.remove('bg-white', 'dark:bg-[#1E1E1E]', 'hover:bg-white/10', 'hover:bg-black/5', 'bg-emerald-50/80', 'border-brand-mint/50', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]');
+            // Text handled in template below
         } else {
-            el.classList.add('border-white/5');
-            el.style.backgroundColor = '#1E1E1E'; // Solid opaque brand-gray
+            el.classList.add('border-black/5', 'dark:border-white/5', 'bg-white', 'dark:bg-[#1E1E1E]', 'hover:bg-gray-50', 'dark:hover:bg-[#262626]');
+            el.classList.remove('bg-brand-mint/10', 'dark:bg-[#222F2F]', 'bg-[#EBFBF0]', 'bg-emerald-50/80', 'bg-brand-mint', 'text-white', 'border-transparent');
         }
         if (canControl) el.classList.add('cursor-grab', 'active:cursor-grabbing');
 
-        // 3. Content Update
+        // 3. Content Update - Optimized to prevent re-rendering equalizers on play/pause
+        const isHost = song.requesterId === roomId;
+        let requesterDisplay = decodeHtmlEntities(song.requester);
+        if (isHost && !requesterDisplay.includes('(Host)')) {
+            requesterDisplay += ' (Host)';
+        }
+
+        // TEXT COLOR LOGIC FOR MINT BG
+        const titleClass = isActive ? 'text-white dark:text-brand-mint' : 'text-gray-900 dark:text-gray-100';
+        const metaClass = isActive ? 'text-white/90 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400';
+        const highlightClass = isMySong ? (isActive ? 'text-white font-bold dark:text-brand-mint' : 'text-brand-mint') : '';
+
+        // Full render required to ensure consistency with Remote (Equalizer resets on pause)
         el.innerHTML = `
             ${canControl ? '<div class="w-6 text-gray-500 text-center drag-handle cursor-grab">≡</div>' : ''}
             <div class="thumb-container w-12 h-12 bg-gray-800 rounded-md overflow-hidden flex-shrink-0 relative">
                 <img src="${song.thumbnail || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" class="w-full h-full object-cover">
                 ${isActive ? `
-                <div class="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <div class="absolute inset-0 bg-black/60 flex items-center justify-center equalizer-overlay">
                     <div class="equalizer-bar small ${currentSongData?.status !== 'playing' ? 'paused' : ''}"><span></span><span></span><span></span></div>
                 </div>` : ''}
             </div>
             <div class="flex-1 min-w-0 pr-2">
-                <h4 class="title-text font-bold truncate text-sm ${isActive ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.title)}</h4>
-                <p class="text-xs text-gray-400 truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${isMySong ? 'text-brand-mint' : ''}">${decodeHtmlEntities(song.requester)}</span></p>
+                <h4 class="title-text font-bold truncate text-sm ${titleClass}">${decodeHtmlEntities(song.title)}</h4>
+                <p class="text-xs ${metaClass} truncate">${decodeHtmlEntities(song.artist) || 'Unknown'} | <span class="${highlightClass}">${requesterDisplay}</span></p>
             </div>
-            <span class="duration-text text-xs text-gray-500 flex-shrink-0 hidden sm:block">${song.duration ? formatTime(song.duration) : '--:--'}</span>
+            <span class="duration-text text-xs ${metaClass} flex-shrink-0 hidden sm:block">${song.duration ? formatTime(song.duration) : '--:--'}</span>
         `;
 
         // 4. Append to list (automatically moves existing elements)
@@ -1721,7 +1731,7 @@ function renderHostQueue() {
                     const updates = {};
                     items.forEach((item, index) => {
                         const key = item.dataset.key;
-                        updates[`rooms/${roomId}/queue/${key}/order`] = index;
+                        updates[`rooms / ${roomId} /queue/${key}/order`] = index;
                     });
                     update(ref(db), updates).then(() => {
                         setTimeout(() => { isDragging = false; }, 500);
@@ -1901,6 +1911,8 @@ function setFullPlayerHeight() {
 window.addEventListener('resize', () => {
     if (!fullPlayer.classList.contains('hidden')) {
         setFullPlayerHeight();
+        // Recalculate LP center video position after resize
+        setTimeout(() => switchYTPlayerMode('lp'), 100);
     }
 });
 
@@ -1911,6 +1923,8 @@ window.addEventListener('orientationchange', () => {
         setTimeout(setFullPlayerHeight, 100);
         setTimeout(setFullPlayerHeight, 300);
         setTimeout(setFullPlayerHeight, 500);
+        // Recalculate LP center video position
+        setTimeout(() => switchYTPlayerMode('lp'), 600);
     }
 });
 
@@ -1935,10 +1949,14 @@ const openFullPlayer = () => {
             applyMarquee();
         });
     });
+
+    // Switch YouTube player to LP center mode after slide-up animation
+    setTimeout(() => switchYTPlayerMode('lp'), 550);
 };
 
 // Close Full Player with animation
 const closeFullPlayer = () => {
+    switchYTPlayerMode('bg');
     fullPlayer.classList.add('translate-y-full');
     fullPlayer.style.transform = 'translateY(100%)';
     fullPlayer.style.webkitTransform = 'translateY(100%)';
@@ -2548,7 +2566,7 @@ async function performHostSearch(query, container, inputEl) {
         }
     }
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error('API Error');
@@ -2569,7 +2587,7 @@ async function performHostSearch(query, container, inputEl) {
             el.innerHTML = `
                 <img src="${vid.thumb}" class="w-12 h-9 object-cover rounded">
                 <div class="flex-1 min-w-0">
-                    <h4 class="text-sm font-bold truncate text-white">${vid.title}</h4>
+                    <h4 class="text-sm font-bold truncate text-gray-900 dark:text-white">${vid.title}</h4>
                 </div>
                 <button class="bg-brand-mint text-black px-3 py-1 rounded text-xs font-bold">${t('add_button')}</button>
             `;
