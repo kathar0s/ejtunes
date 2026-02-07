@@ -30,7 +30,7 @@ export default {
             },
             backgroundImage: {
                 'login-day': "url('/bg_light.jpeg')",
-                'login-night': "url('/bg_night.jpeg')",
+                'login-dark': "url('/bg_dark.jpeg')",
             },
         },
     },

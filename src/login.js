@@ -1,6 +1,7 @@
 import { auth, provider } from './firebase-config';
 import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 import { initLanguage, setLanguage, updatePageText } from './i18n';
+import { themeManager } from './theme-manager';
 
 // Init I18n
 initLanguage();
@@ -42,25 +43,7 @@ loginBtn.addEventListener('click', () => {
 });
 
 // Theme Toggle Logic
-(function initLoginTheme() {
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark && !document.documentElement.classList.contains('light')) {
-        document.documentElement.classList.add('dark');
-    }
-
-    if (themeToggle) {
-        themeToggle.checked = document.documentElement.classList.contains('dark');
-        themeToggle.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                document.documentElement.classList.add('dark');
-                document.documentElement.classList.remove('light');
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.classList.add('light');
-            }
-        });
-    }
-})();
+themeManager.bindToggle('login-theme-toggle');
 
 // Auth State Monitor
 onAuthStateChanged(auth, (user) => {
