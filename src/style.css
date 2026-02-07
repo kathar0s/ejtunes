@@ -410,23 +410,35 @@ input[type="range"]:active::-moz-range-thumb {
   pointer-events: none;
 }
 
-/* LP Scratches for realistic rotation feel */
-/* LP Scratches for realistic rotation feel - distinct single lines */
+/* LP Scratches - Organic Hairline Scratches */
 .lp-scratches {
   background:
-    /* Scratch 1: A single distinct scratch */
-    linear-gradient(105deg,
-      transparent 40%,
-      rgba(255, 255, 255, 0.1) 40.2%,
-      transparent 40.4%),
-    /* Scratch 2: A subtle secondary scratch */
-    linear-gradient(25deg,
-      transparent 65%,
-      rgba(255, 255, 255, 0.05) 65.2%,
-      transparent 65.4%);
-  mix-blend-mode: normal;
+    /* Very subtle organic hairline noise */
+    conic-gradient(from 0deg,
+      transparent 10%,
+      rgba(255, 255, 255, 0.05) 10.2%,
+      transparent 10.4%,
+      transparent 15%,
+      rgba(255, 255, 255, 0.03) 15.1%,
+      transparent 15.2%,
+      transparent 45%,
+      rgba(255, 255, 255, 0.04) 45.3%,
+      transparent 45.6%,
+      transparent 80%,
+      rgba(255, 255, 255, 0.06) 80.1%,
+      transparent 80.2%);
+  mix-blend-mode: overlay;
   pointer-events: none;
-  opacity: 1;
+  opacity: 0.8;
+}
+
+/* Surface Warp/Waves Simulation */
+.lp-warps {
+  background:
+    radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+    radial-gradient(circle at 60% 70%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
 }
 
 /* Silver Spindle - Metallic Look */
