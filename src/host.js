@@ -816,6 +816,9 @@ function resetProgressBar() {
 function startProgressLoop() {
     if (progressInterval) clearInterval(progressInterval);
     progressInterval = setInterval(() => {
+        // Optimization: Skip UI updates if tab is hidden to save battery
+        if (document.hidden) return;
+
         if (!player || !isPlayerReady || typeof player.getPlayerState !== 'function') return;
         if (player.getPlayerState() !== YT.PlayerState.PLAYING) return;
 
@@ -840,6 +843,27 @@ function startProgressLoop() {
         }
     }, 1000);
 }
+
+// Battery Optimization: Handle visibility change to pause/resume visuals
+document.addEventListener('visibilitychange', () => {
+    if (!player || typeof player.getPlayerState !== 'function') return;
+
+    const isPlaying = player.getPlayerState() === YT.PlayerState.PLAYING;
+    const isFullVisible = fullPlayer && !fullPlayer.classList.contains('hidden');
+
+    if (document.hidden) {
+        // Tab is backgrounded: Stop heavy visuals
+        console.log('[Battery] Background detected. Pausing non-essential animations.');
+        if (lpContainer) lpContainer.style.animationPlayState = 'paused';
+        if (ytPlayerWrapper) ytPlayerWrapper.style.animationPlayState = 'paused';
+    } else {
+        // Tab is foregrounded: Resume if playing
+        console.log('[Battery] Foreground detected. Resuming visuals.');
+        if (isPlaying && isFullVisible) {
+            setVisuals(true);
+        }
+    }
+});
 
 function formatTime(seconds) {
     if (!seconds || isNaN(seconds)) return '0:00';
