@@ -305,20 +305,32 @@ function renderActiveRooms() {
 
         hasActiveRooms = true;
         const el = document.createElement('div');
-        el.className = 'bg-brand-gray p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/10 transition border border-white/5';
+        const currentPlayback = room.current_playback || {};
+        const hasSong = !!currentPlayback.videoId;
+        const songTitle = hasSong ? decodeHtmlEntities(currentPlayback.title) : (t('preparing_music') || '음악을 준비중입니다.');
+
+        el.className = 'bg-white/80 dark:bg-brand-gray p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/95 dark:hover:bg-white/10 transition border border-black/5 dark:border-white/5 shadow-sm';
         el.innerHTML = `
-                <div class="w-12 h-12 flex items-center justify-center text-white">
-                    <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 18V5l12-2v13"></path>
-                        <circle cx="6" cy="18" r="3"></circle>
-                        <circle cx="18" cy="16" r="3"></circle>
-                    </svg>
+                <div class="w-12 h-12 flex-shrink-0 bg-black/5 dark:bg-white/5 rounded-lg overflow-hidden flex items-center justify-center text-brand-mint">
+                    ${currentPlayback.thumbnail ?
+                `<img src="${currentPlayback.thumbnail}" class="w-full h-full object-cover" alt="Album Art">` :
+                `<svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 18V5l12-2v13"></path>
+                            <circle cx="6" cy="18" r="3"></circle>
+                            <circle cx="18" cy="16" r="3"></circle>
+                        </svg>`
+            }
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-bold truncate">${info.name || 'Unnamed Room'}</h3>
-                    <p class="text-sm text-gray-400">${info.creatorName || 'Unknown'}</p>
+                    <div class="flex items-baseline gap-2 mb-0.5">
+                        <h3 class="font-bold truncate text-gray-900 dark:text-white">${info.name || 'Unnamed Room'}</h3>
+                        <span class="text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">${info.creatorName || 'Unknown'}</span>
+                    </div>
+                    <p class="text-sm ${hasSong ? 'text-brand-mint font-medium' : 'text-gray-400 dark:text-gray-500'} truncate">
+                        ${songTitle}
+                    </p>
                 </div>
-                <span class="text-brand-mint font-mono text-sm">${child.key}</span>
+                <span class="text-brand-mint font-mono text-xs opacity-60">${child.key}</span>
             `;
         el.addEventListener('click', () => joinRoom(child.key));
         list.appendChild(el);

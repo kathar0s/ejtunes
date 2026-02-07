@@ -27,7 +27,7 @@ const resources = {
         added_to_queue: "Added to queue!",
         failed_add: "Failed to add song",
         pro_tip: "💡 Pro Tip",
-        pro_tip_desc: "Log in with <span class='text-white'>YouTube Premium</span> on this browser to play music without ads.",
+        pro_tip_desc: "Log in with <span class='text-gray-800 dark:text-white'>YouTube Premium</span> on this browser to play music without ads.",
         settings: "Settings",
         language: "Language",
         logout: "Logout",
@@ -61,6 +61,7 @@ const resources = {
         private_room: "Private Room",
         private_room_hint: "Hidden from active room list",
         host_control_only: "Host Control Only",
+        dark_mode: "Dark Mode",
         delete: "Delete",
         update_available: "New Version Available",
         update_desc: "Version {version} has been released. Please refresh to update.",
@@ -70,7 +71,8 @@ const resources = {
         error_desc_host: "This host session seems to be gone. You can try refreshing to check again, or just head back to create a new one.",
         back_to_home: "Back to Home",
         host_not_found_title: "Host Not Found",
-        waiting_reconnect: "Waiting for reconnection..."
+        waiting_reconnect: "Waiting for reconnection...",
+        preparing_music: "Preparing music..."
     },
     ko: {
         app_title: "EJTunes",
@@ -99,7 +101,7 @@ const resources = {
         added_to_queue: "대기열에 추가되었습니다!",
         failed_add: "곡 추가 실패",
         pro_tip: "💡 꿀팁",
-        pro_tip_desc: "이 브라우저에서 <span class='text-white'>유튜브 프리미엄</span>에 로그인하면 광고 없이 재생됩니다.",
+        pro_tip_desc: "이 브라우저에서 <span class='text-gray-800 dark:text-white'>유튜브 프리미엄</span>에 로그인하면 광고 없이 재생됩니다.",
         settings: "설정",
         language: "언어 (Language)",
         logout: "로그아웃",
@@ -133,6 +135,7 @@ const resources = {
         private_room: "비공개 방",
         private_room_hint: "방 목록에 표시되지 않습니다",
         host_control_only: "제어 권한이 없습니다",
+        dark_mode: "다크 모드",
         delete: "삭제",
         update_available: "새로운 버전 사용 가능",
         update_desc: "새로운 버전 {version}이(가) 출시되었습니다. 업데이트를 위해 새로고침해 주세요.",
@@ -142,7 +145,8 @@ const resources = {
         error_desc_host: "이 방은 존재하지 않습니다.<br/>메인 화면으로 돌아가서 새 방을 만들어주세요.",
         back_to_home: "메인 화면으로",
         host_not_found_title: "호스트를 찾을 수 없습니다",
-        waiting_reconnect: "재연결 대기 중..."
+        waiting_reconnect: "재연결 대기 중...",
+        preparing_music: "음악을 준비중입니다."
     }
 };
 
