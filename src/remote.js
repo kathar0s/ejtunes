@@ -237,7 +237,8 @@ onAuthStateChanged(auth, (user) => {
 function handleNavigation() {
     const path = window.location.pathname.substring(1);
     const urlParams = new URLSearchParams(window.location.search);
-    const roomFromQuery = urlParams.get('room');
+    const targetRoom = (path && path.length >= 4 && !path.startsWith('host')) ? path : roomFromQuery;
+
     if (targetRoom) {
         joinRoom(targetRoom, false); // Don't push state on initial load or popstate
     } else {
