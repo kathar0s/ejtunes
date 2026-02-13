@@ -1270,6 +1270,7 @@ function switchYTPlayerMode(mode) {
     }
 }
 
+
 function setVisuals(isPlaying) {
     // Optimization: Only animate if playing AND full player is visible
     const isVisible = fullPlayer && !fullPlayer.classList.contains('hidden');
@@ -2139,11 +2140,27 @@ const openFullPlayer = () => {
             fullPlayer.style.transform = 'translateY(0)';
             fullPlayer.style.webkitTransform = 'translateY(0)';
             if (isKioskActive) {
-                // Position YT player + disc AFTER slide-up animation completes (500ms)
-                setTimeout(() => {
+                // Position video on jacket (opacity:0) + fade in after slide-up completes
+                setTimeout(function() {
+                    // Disable transition with !important to override CSS !important
+                    if (ytPlayerWrapper) {
+                        ytPlayerWrapper.style.setProperty('transition', 'none', 'important');
+                        ytPlayerWrapper.style.setProperty('-webkit-transition', 'none', 'important');
+                    }
                     switchYTPlayerMode('kiosk');
                     positionKioskDisc();
-                }, 550);
+                    // Commit opacity:0, then re-enable CSS transition for fade-in
+                    if (ytPlayerWrapper) {
+                        void ytPlayerWrapper.offsetHeight;
+                        ytPlayerWrapper.style.removeProperty('transition');
+                        ytPlayerWrapper.style.removeProperty('-webkit-transition');
+                    }
+                    requestAnimationFrame(function() {
+                        if (ytPlayerWrapper) {
+                            ytPlayerWrapper.classList.add('yt-kiosk-visible');
+                        }
+                    });
+                }, 500);
             } else {
                 applyMarquee();
             }
@@ -2154,34 +2171,50 @@ const openFullPlayer = () => {
 // Close Full Player with animation
 const closeFullPlayer = () => {
     if (isKioskActive) {
-        // --- Kiosk Cleanup ---
+        // --- Kiosk Exit: fade out video first, then cleanup ---
         isKioskActive = false;
-        const kioskOverlay = document.getElementById('kiosk-overlay');
-        const mainContent = fullPlayer.querySelector('.relative.z-10.w-full.h-full');
 
-        if (kioskOverlay) kioskOverlay.classList.add('hidden');
-        if (mainContent) mainContent.classList.remove('hidden');
-
-        // Restore normal full player controls
-        const fullscreenToggle = document.getElementById('full-fullscreen-toggle');
-        const qrContainer = document.getElementById('full-qr-container');
-        const collapseBtn = document.getElementById('collapse-player-btn');
-        if (fullscreenToggle) fullscreenToggle.classList.remove('hidden');
-        if (qrContainer) qrContainer.classList.remove('hidden');
-        if (collapseBtn) collapseBtn.classList.remove('hidden');
-
-        // Release Wake Lock
+        // Release Wake Lock & remove kiosk event listeners immediately
         releaseWakeLock();
-
-        // Remove kiosk event listeners
         teardownKioskListeners();
         window.removeEventListener('resize', onKioskResize);
         window.removeEventListener('orientationchange', onKioskResize);
 
-        // Clean up YT player kiosk mode
+        // Fade out video (kiosk overlay stays visible behind it)
         if (ytPlayerWrapper) {
-            ytPlayerWrapper.classList.remove('yt-kiosk-mode');
+            ytPlayerWrapper.classList.remove('yt-kiosk-visible');
         }
+
+        // After fade out completes: hide overlay, restore UI, slide down
+        setTimeout(function() {
+            const kioskOverlay = document.getElementById('kiosk-overlay');
+            const mainContent = fullPlayer.querySelector('.relative.z-10.w-full.h-full');
+            if (kioskOverlay) kioskOverlay.classList.add('hidden');
+            if (mainContent) mainContent.classList.remove('hidden');
+
+            const fullscreenToggle = document.getElementById('full-fullscreen-toggle');
+            const qrContainer = document.getElementById('full-qr-container');
+            const collapseBtn = document.getElementById('collapse-player-btn');
+            if (fullscreenToggle) fullscreenToggle.classList.remove('hidden');
+            if (qrContainer) qrContainer.classList.remove('hidden');
+            if (collapseBtn) collapseBtn.classList.remove('hidden');
+
+            // Switch video to main mode instantly (no animation) behind the panel
+            if (ytPlayerWrapper) {
+                ytPlayerWrapper.style.transition = 'none';
+                ytPlayerWrapper.style.webkitTransition = 'none';
+                ytPlayerWrapper.classList.remove('yt-kiosk-mode');
+            }
+            switchYTPlayerMode('main');
+            if (ytPlayerWrapper) {
+                void ytPlayerWrapper.offsetHeight;
+                ytPlayerWrapper.style.transition = '';
+                ytPlayerWrapper.style.webkitTransition = '';
+            }
+            slideDownFullPlayer();
+        }, 500);
+
+        return;
     }
 
     // Cleanup LP Mode
@@ -2203,12 +2236,17 @@ const closeFullPlayer = () => {
 
     // Return to main video mode
     switchYTPlayerMode('main');
+    slideDownFullPlayer();
+};
+
+function slideDownFullPlayer() {
+    if (fullPlayer.classList.contains('translate-y-full')) return;
 
     fullPlayer.classList.add('translate-y-full');
     fullPlayer.style.transform = 'translateY(100%)';
     fullPlayer.style.webkitTransform = 'translateY(100%)';
 
-    setTimeout(() => {
+    setTimeout(function() {
         fullPlayer.classList.add('hidden');
         fullPlayer.style.display = 'none';
         fullPlayer.style.transform = '';
@@ -2217,7 +2255,7 @@ const closeFullPlayer = () => {
 
         if (lpContainer) lpContainer.style.animationPlayState = 'paused';
     }, 500);
-};
+}
 
 // Queue Panel Toggle
 const queuePanel = document.getElementById('queue-panel');
@@ -3044,6 +3082,8 @@ function updateKioskUI(data) {
         if (kioskDiscArt) kioskDiscArt.src = hiRes;
         const kioskBgArt = document.getElementById('kiosk-bg-art');
         if (kioskBgArt) kioskBgArt.src = hiRes;
+        const kioskJacketArt = document.getElementById('kiosk-jacket-art');
+        if (kioskJacketArt) kioskJacketArt.src = hiRes;
     }
 }
 

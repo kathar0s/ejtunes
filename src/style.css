@@ -464,12 +464,17 @@ input[type="range"]:active::-moz-range-thumb {
   pointer-events: none !important;
   box-shadow: none !important;
   filter: none !important;
-  opacity: 1 !important;
+  opacity: 0 !important;
   animation: none !important;
-  transition: none !important;
+  -webkit-transition: opacity 500ms ease !important;
+  transition: opacity 500ms ease !important;
   bottom: auto !important;
   /* left, width, height are set by JS inline styles — no !important here */
   aspect-ratio: 1 / 1 !important;
+}
+
+.yt-kiosk-mode.yt-kiosk-visible {
+  opacity: 1 !important;
 }
 
 #yt-player-wrapper.yt-kiosk-mode #player {
