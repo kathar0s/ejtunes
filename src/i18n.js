@@ -72,7 +72,15 @@ const resources = {
         back_to_home: "Back to Home",
         host_not_found_title: "Host Not Found",
         waiting_reconnect: "Waiting for reconnection...",
-        preparing_music: "Preparing music..."
+        preparing_music: "Preparing music...",
+        kiosk_mode: "Kiosk Mode",
+        kiosk_mode_hint: "Cafe display mode",
+        scan_to_request: "Scan to request a song",
+        exit_kiosk: "Exit Kiosk Mode?",
+        exit_kiosk_desc: "Return to the normal player view.",
+        cancel_btn: "Cancel",
+        exit_btn: "Exit",
+        requested_by: "Requested by"
     },
     ko: {
         app_title: "EJTunes",
@@ -146,7 +154,15 @@ const resources = {
         back_to_home: "메인 화면으로",
         host_not_found_title: "호스트를 찾을 수 없습니다",
         waiting_reconnect: "재연결 대기 중...",
-        preparing_music: "음악을 준비중입니다."
+        preparing_music: "음악을 준비중입니다.",
+        kiosk_mode: "키오스크 모드",
+        kiosk_mode_hint: "카페 디스플레이 모드",
+        scan_to_request: "스캔하여 곡 신청",
+        exit_kiosk: "키오스크 모드 종료",
+        exit_kiosk_desc: "일반 플레이어 화면으로 돌아갑니다.",
+        cancel_btn: "취소",
+        exit_btn: "나가기",
+        requested_by: "신청"
     }
 };
 

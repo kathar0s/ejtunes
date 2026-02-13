@@ -231,6 +231,9 @@ onAuthStateChanged(auth, (user) => {
 
 
 
+    } else {
+        // Not logged in: Redirect to login
+        window.location.href = '/login';
     }
 });
 

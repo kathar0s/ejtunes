@@ -31,6 +31,13 @@ let activeSessions = [];
 let isSharedControl = false; // Default to false until loaded
 let currentSessionRef = null;
 
+// Kiosk Mode State
+let isKioskEnabled = false;
+let isKioskActive = false;
+let wakeLock = null;
+let kioskExitTapCount = 0;
+let kioskExitTapTimer = null;
+
 function isAmILeader() {
     if (!mySessionId || activeSessions.length === 0) return false;
     return activeSessions[0].key === mySessionId;
@@ -254,90 +261,6 @@ const sharedControlToggle = document.getElementById('shared-control-toggle');
 const privateRoomToggle = document.getElementById('private-room-toggle');
 const lastControllerInfo = document.getElementById('last-controller-info');
 const lastControllerName = document.getElementById('last-controller-name');
-// State Management for PIP Mode
-let isPIPMode = false;
-
-const updatePIPPosition = (forceNoTransition = false, forcedPercent = null) => {
-    if (!ytPlayerWrapper || !ytPlayerWrapper.classList.contains('yt-pip-mode')) return;
-
-    let percent;
-    if (forcedPercent !== null) {
-        percent = forcedPercent;
-    } else {
-        if (!player || typeof player.getCurrentTime !== 'function' || typeof player.getDuration !== 'function') return;
-        const current = player.getCurrentTime();
-        const duration = player.getDuration();
-        if (duration <= 0) return;
-        percent = (current / duration) * 100;
-    }
-
-    if (forceNoTransition) {
-        ytPlayerWrapper.style.setProperty('transition', 'none', 'important');
-    }
-
-    const pipWidth = 160;
-    const miniProgressContainer = document.getElementById('mini-progress-container');
-    const containerWidth = miniProgressContainer ? miniProgressContainer.offsetWidth : 0;
-    if (containerWidth === 0) return;
-
-    const maxTranslate = Math.max(0, containerWidth - pipWidth);
-    let translateX = (percent / 100) * containerWidth - (pipWidth / 2);
-    translateX = Math.max(0, Math.min(translateX, maxTranslate));
-
-    ytPlayerWrapper.style.transform = `translateX(${translateX}px)`;
-
-    if (forceNoTransition) {
-        ytPlayerWrapper.offsetHeight; // Force reflow
-        setTimeout(() => {
-            ytPlayerWrapper.style.removeProperty('transition');
-        }, 100);
-    }
-};
-
-const switchPIPMode = (enabled, forceInstant = false) => {
-    if (!ytPlayerWrapper) return;
-    isPIPMode = enabled;
-
-    if (forceInstant) {
-        ytPlayerWrapper.style.setProperty('transition', 'none', 'important');
-    }
-
-    if (enabled) {
-        // Switch to PIP
-        ytPlayerWrapper.classList.remove('yt-bg-mode', 'yt-lp-mode');
-        ytPlayerWrapper.classList.add('yt-pip-mode');
-
-        // Use timeout to ensure closeFullPlayer doesn't conflict with transition start
-        const fullPlayer = document.getElementById('full-player');
-        if (fullPlayer && !fullPlayer.classList.contains('hidden')) {
-            // If full player is open, we close it
-            const collapseBtn = document.getElementById('collapse-player-btn');
-            if (collapseBtn) collapseBtn.click();
-        }
-
-        updatePIPPosition(true);
-    } else {
-        // Switch to Background
-        ytPlayerWrapper.classList.remove('yt-pip-mode');
-        ytPlayerWrapper.classList.add('yt-bg-mode');
-        ytPlayerWrapper.style.transform = '';
-
-        const fullPlayer = document.getElementById('full-player');
-        if (fullPlayer && fullPlayer.classList.contains('hidden')) {
-            // If full player is closed, we open it
-            const expandBtn = document.getElementById('expand-player-btn');
-            if (expandBtn) expandBtn.click();
-        }
-    }
-
-    if (forceInstant) {
-        ytPlayerWrapper.offsetHeight; // Force reflow
-        setTimeout(() => {
-            ytPlayerWrapper.style.removeProperty('transition');
-        }, 100);
-    }
-};
-
 // Immediate UI State Check to prevent FOUC (Flash of Unstyled Content / Setup Screen)
 (function () {
     const pathSegments = window.location.pathname.split('/');
@@ -354,6 +277,14 @@ const switchPIPMode = (enabled, forceInstant = false) => {
         }
     }
 })();
+
+// Restore kiosk mode from localStorage or URL parameter
+if (new URLSearchParams(window.location.search).get('mode') === 'kiosk') {
+    isKioskEnabled = true;
+    localStorage.setItem('ejtunes_kiosk', 'true');
+} else if (localStorage.getItem('ejtunes_kiosk') === 'true') {
+    isKioskEnabled = true;
+}
 
 // Handle browser back/forward button - reload to reset room state cleanly
 window.addEventListener('popstate', () => {
@@ -743,8 +674,8 @@ function initYouTubePlayer() {
 
 function createPlayer() {
     player = new YT.Player('player', {
-        height: '360',
-        width: '640',
+        height: '200',
+        width: '356',
         host: 'https://www.youtube-nocookie.com',
         playerVars: {
             'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'autoplay': 1, 'enablejsapi': 1,
@@ -758,9 +689,17 @@ function createPlayer() {
     });
 }
 
+
 function onPlayerReady() {
     isPlayerReady = true;
-    if (ytPlayerWrapper) ytPlayerWrapper.style.display = '';
+
+    if (ytPlayerWrapper) {
+        ytPlayerWrapper.style.display = '';
+        // Ensure we start in main video mode if full player is hidden
+        if (document.getElementById('full-player').classList.contains('hidden')) {
+            switchYTPlayerMode('main');
+        }
+    }
     initListeners();
     startProgressLoop();
 }
@@ -888,8 +827,6 @@ function resetProgressBar() {
     if (miniProgressHandle) miniProgressHandle.style.left = '0%';
     progCurrent.textContent = '0:00';
 
-    // Instant PIP jump to start
-    if (isPIPMode) updatePIPPosition(true, 0);
     requestAnimationFrame(() => {
         setTimeout(() => {
             progressBarMini.style.transition = '';
@@ -926,8 +863,15 @@ function startProgressLoop() {
                     progCurrent.textContent = formatTime(current);
                 }
 
-                // PIP Mode Horizontal Tracking
-                if (isPIPMode) updatePIPPosition();
+                // Kiosk progress bar + time
+                if (isKioskActive) {
+                    const kioskProgressBar = document.getElementById('kiosk-progress-bar');
+                    if (kioskProgressBar) kioskProgressBar.style.width = `${percent}%`;
+                    const kioskTimeCurrent = document.getElementById('kiosk-time-current');
+                    const kioskTimeDuration = document.getElementById('kiosk-time-duration');
+                    if (kioskTimeCurrent) kioskTimeCurrent.textContent = formatTime(current);
+                    if (kioskTimeDuration) kioskTimeDuration.textContent = formatTime(duration);
+                }
             }
 
             // Duration should always be valid
@@ -1023,9 +967,6 @@ const onSeekEnd = (e) => {
             if (fullProgressHandle) fullProgressHandle.style.left = `${finalPercent}%`;
             progCurrent.textContent = formatTime(seekTime);
 
-            // Instant PIP jump
-            if (isPIPMode) updatePIPPosition(true, finalPercent);
-
             // Restore transition after a short delay
             setTimeout(() => {
                 progressBarMini.style.removeProperty('transition');
@@ -1085,8 +1026,6 @@ const handleScrubVisuals = (e) => {
         progCurrent.textContent = formatTime(duration * percent);
     }
 
-    // Real-time PIP tracking during scrubbing
-    if (isPIPMode) updatePIPPosition(true, percent * 100);
 };
 
 
@@ -1306,12 +1245,28 @@ function switchYTPlayerMode(mode) {
         ytPlayerWrapper.style.height = diameter + 'px';
         ytPlayerWrapper.style.left = (centerX - diameter / 2) + 'px';
         ytPlayerWrapper.style.top = (centerY - diameter / 2) + 'px';
+    } else if (mode === 'kiosk') {
+        const jacket = document.getElementById('kiosk-jacket');
+        if (!jacket) return;
+
+        const rect = jacket.getBoundingClientRect();
+        ytPlayerWrapper.className = 'yt-kiosk-mode';
+        ytPlayerWrapper.style.width = rect.width + 'px';
+        ytPlayerWrapper.style.height = rect.height + 'px';
+        ytPlayerWrapper.style.left = rect.left + 'px';
+        ytPlayerWrapper.style.top = rect.top + 'px';
+        ytPlayerWrapper.style.bottom = 'auto';
+        ytPlayerWrapper.style.transform = 'none';
     } else {
-        ytPlayerWrapper.className = 'yt-bg-mode';
+        // Main mode: reset all inline styles, use CSS defaults
+        ytPlayerWrapper.className = '';
         ytPlayerWrapper.style.width = '';
         ytPlayerWrapper.style.height = '';
         ytPlayerWrapper.style.left = '';
         ytPlayerWrapper.style.top = '';
+        ytPlayerWrapper.style.bottom = '';
+        ytPlayerWrapper.style.transform = '';
+        ytPlayerWrapper.style.borderRadius = '';
     }
 }
 
@@ -1319,10 +1274,18 @@ function setVisuals(isPlaying) {
     // Optimization: Only animate if playing AND full player is visible
     const isVisible = fullPlayer && !fullPlayer.classList.contains('hidden');
     const state = (isPlaying && isVisible) ? 'running' : 'paused';
-    lpContainer.style.animationPlayState = state;
-    // Sync video player rotation with LP
-    if (ytPlayerWrapper) {
+
+    if (lpContainer) lpContainer.style.animationPlayState = state;
+
+    // Sync video player rotation with LP (if LP mode is active)
+    if (ytPlayerWrapper && ytPlayerWrapper.classList.contains('yt-lp-mode')) {
         ytPlayerWrapper.style.animationPlayState = state;
+    }
+
+    // Kiosk LP disc rotation sync
+    const kioskDisc = document.getElementById('kiosk-lp-disc');
+    if (kioskDisc && isKioskActive) {
+        kioskDisc.style.animationPlayState = state;
     }
 
     if (isPlaying) {
@@ -1344,8 +1307,6 @@ function initListeners() {
     const playbackRef = ref(db, `rooms/${roomId}/current_playback`);
     onValue(playbackRef, (snapshot) => {
         const data = snapshot.val();
-        if (!data) return;
-
         if (!data) return;
 
         currentSongData = data;
@@ -1987,6 +1948,9 @@ function updateHostUI(data) {
         fullTitle.dataset.originalTitle = title;
         fullTitle.textContent = title;
     }
+
+    // Update kiosk UI if active
+    if (isKioskActive) updateKioskUI(data);
 }
 
 // Marquee Logic for Fullscreen Title (Seamless Loop)
@@ -2037,22 +2001,67 @@ function setFullPlayerHeight() {
 window.addEventListener('resize', () => {
     if (!fullPlayer.classList.contains('hidden')) {
         setFullPlayerHeight();
-        // Recalculate LP center video position after resize
-        setTimeout(() => switchYTPlayerMode('lp'), 100);
+        if (isKioskActive) {
+            setTimeout(() => {
+                switchYTPlayerMode('kiosk');
+                positionKioskDisc();
+            }, 100);
+        } else {
+            // Recalculate LP center video position after resize
+            setTimeout(() => switchYTPlayerMode('lp'), 100);
+        }
     }
 });
 
 // Handle orientation change with multiple delayed updates (iOS Safari needs time)
 window.addEventListener('orientationchange', () => {
     if (!fullPlayer.classList.contains('hidden')) {
-        // Multiple updates to catch the final viewport size
         setTimeout(setFullPlayerHeight, 100);
         setTimeout(setFullPlayerHeight, 300);
         setTimeout(setFullPlayerHeight, 500);
-        // Recalculate LP center video position
-        setTimeout(() => switchYTPlayerMode('lp'), 600);
+        if (isKioskActive) {
+            setTimeout(() => {
+                switchYTPlayerMode('kiosk');
+                positionKioskDisc();
+            }, 600);
+        } else {
+            setTimeout(() => switchYTPlayerMode('lp'), 600);
+        }
     }
 });
+
+// Open Full Player with animation
+// Sync Video Player Position with LP Vinyl
+let lpSyncFrameId = null;
+
+const syncLPPosition = () => {
+    const lpContainer = document.getElementById('lp-art-container');
+
+    // Safety check: if LP container is gone or full player hidden, stop sync
+    if (!lpContainer || fullPlayer.classList.contains('hidden')) {
+        if (lpSyncFrameId) {
+            cancelAnimationFrame(lpSyncFrameId);
+            lpSyncFrameId = null;
+        }
+        return;
+    }
+
+    const rect = lpContainer.getBoundingClientRect();
+
+    // Apply LP dimensions and position to video wrapper
+    if (ytPlayerWrapper) {
+        ytPlayerWrapper.style.top = `${rect.top}px`;
+        ytPlayerWrapper.style.left = `${rect.left}px`;
+        ytPlayerWrapper.style.width = `${rect.width}px`;
+        ytPlayerWrapper.style.height = `${rect.height}px`;
+
+        // Ensure circular clipping
+        ytPlayerWrapper.style.borderRadius = '50%';
+    }
+
+    // Continue loop
+    lpSyncFrameId = requestAnimationFrame(syncLPPosition);
+};
 
 // Open Full Player with animation
 const openFullPlayer = () => {
@@ -2060,10 +2069,67 @@ const openFullPlayer = () => {
     fullPlayer.classList.remove('hidden');
     fullPlayer.style.display = 'block';
 
-    // Sync animation state immediately when visible
-    if (player && player.getPlayerState) {
-        const isPlaying = player.getPlayerState() === YT.PlayerState.PLAYING;
-        setVisuals(isPlaying);
+    if (isKioskEnabled) {
+        // --- Kiosk Layout ---
+        isKioskActive = true;
+        const kioskOverlay = document.getElementById('kiosk-overlay');
+        const mainContent = fullPlayer.querySelector('.relative.z-10.w-full.h-full');
+
+        // Show kiosk, hide normal full player content
+        if (kioskOverlay) kioskOverlay.classList.remove('hidden');
+        if (mainContent) mainContent.classList.add('hidden');
+
+        // Hide normal full player controls
+        const fullscreenToggle = document.getElementById('full-fullscreen-toggle');
+        const qrContainer = document.getElementById('full-qr-container');
+        const collapseBtn = document.getElementById('collapse-player-btn');
+        if (fullscreenToggle) fullscreenToggle.classList.add('hidden');
+        if (qrContainer) qrContainer.classList.add('hidden');
+        if (collapseBtn) collapseBtn.classList.add('hidden');
+
+        // Force dark mode for kiosk
+        if (!document.documentElement.classList.contains('dark')) {
+            document.documentElement.classList.add('dark');
+        }
+
+        // Generate kiosk QR code
+        generateKioskQR();
+
+        // Update kiosk UI with current song data
+        if (currentSongData) updateKioskUI(currentSongData);
+
+        // Sync play state for kiosk disc
+        if (player && player.getPlayerState) {
+            const isPlaying = player.getPlayerState() === YT.PlayerState.PLAYING;
+            setVisuals(isPlaying);
+        }
+
+        // Request Wake Lock
+        requestWakeLock();
+
+        // Setup kiosk event listeners
+        setupKioskListeners();
+
+        // Resize listener for kiosk repositioning
+        window.addEventListener('resize', onKioskResize);
+        window.addEventListener('orientationchange', onKioskResize);
+    } else {
+        // --- Normal LP Full Player ---
+        if (ytPlayerWrapper) {
+            ytPlayerWrapper.classList.add('yt-lp-mode');
+            ytPlayerWrapper.classList.add('animate-spin-slow');
+        }
+
+        if (player && player.getPlayerState) {
+            const isPlaying = player.getPlayerState() === YT.PlayerState.PLAYING;
+            setVisuals(isPlaying);
+
+            if (ytPlayerWrapper) {
+                ytPlayerWrapper.style.animationPlayState = isPlaying ? 'running' : 'paused';
+            }
+        }
+
+        syncLPPosition();
     }
 
     // Double RAF to ensure browser registers the display:flex state
@@ -2072,20 +2138,72 @@ const openFullPlayer = () => {
             fullPlayer.classList.remove('translate-y-full');
             fullPlayer.style.transform = 'translateY(0)';
             fullPlayer.style.webkitTransform = 'translateY(0)';
-            applyMarquee();
+            if (isKioskActive) {
+                // Position YT player + disc AFTER slide-up animation completes (500ms)
+                setTimeout(() => {
+                    switchYTPlayerMode('kiosk');
+                    positionKioskDisc();
+                }, 550);
+            } else {
+                applyMarquee();
+            }
         });
     });
-
-    // Switch YouTube player to LP center mode after slide-up animation
-    setTimeout(() => {
-        switchPIPMode(false);
-        switchYTPlayerMode('lp');
-    }, 550);
 };
 
 // Close Full Player with animation
 const closeFullPlayer = () => {
-    switchPIPMode(true);
+    if (isKioskActive) {
+        // --- Kiosk Cleanup ---
+        isKioskActive = false;
+        const kioskOverlay = document.getElementById('kiosk-overlay');
+        const mainContent = fullPlayer.querySelector('.relative.z-10.w-full.h-full');
+
+        if (kioskOverlay) kioskOverlay.classList.add('hidden');
+        if (mainContent) mainContent.classList.remove('hidden');
+
+        // Restore normal full player controls
+        const fullscreenToggle = document.getElementById('full-fullscreen-toggle');
+        const qrContainer = document.getElementById('full-qr-container');
+        const collapseBtn = document.getElementById('collapse-player-btn');
+        if (fullscreenToggle) fullscreenToggle.classList.remove('hidden');
+        if (qrContainer) qrContainer.classList.remove('hidden');
+        if (collapseBtn) collapseBtn.classList.remove('hidden');
+
+        // Release Wake Lock
+        releaseWakeLock();
+
+        // Remove kiosk event listeners
+        teardownKioskListeners();
+        window.removeEventListener('resize', onKioskResize);
+        window.removeEventListener('orientationchange', onKioskResize);
+
+        // Clean up YT player kiosk mode
+        if (ytPlayerWrapper) {
+            ytPlayerWrapper.classList.remove('yt-kiosk-mode');
+        }
+    }
+
+    // Cleanup LP Mode
+    if (ytPlayerWrapper) {
+        ytPlayerWrapper.classList.remove('yt-lp-mode');
+        ytPlayerWrapper.classList.remove('animate-spin-slow');
+        ytPlayerWrapper.style.top = '';
+        ytPlayerWrapper.style.left = '';
+        ytPlayerWrapper.style.width = '';
+        ytPlayerWrapper.style.height = '';
+        ytPlayerWrapper.style.borderRadius = '';
+        ytPlayerWrapper.style.animationPlayState = '';
+    }
+
+    if (lpSyncFrameId) {
+        cancelAnimationFrame(lpSyncFrameId);
+        lpSyncFrameId = null;
+    }
+
+    // Return to main video mode
+    switchYTPlayerMode('main');
+
     fullPlayer.classList.add('translate-y-full');
     fullPlayer.style.transform = 'translateY(100%)';
     fullPlayer.style.webkitTransform = 'translateY(100%)';
@@ -2093,15 +2211,39 @@ const closeFullPlayer = () => {
     setTimeout(() => {
         fullPlayer.classList.add('hidden');
         fullPlayer.style.display = 'none';
-        // Reset transform style to allow class-based control on next open
         fullPlayer.style.transform = '';
         fullPlayer.style.webkitTransform = '';
         fullPlayer.classList.add('translate-y-full');
 
-        // Pause animation to save battery
         if (lpContainer) lpContainer.style.animationPlayState = 'paused';
-    }, 500); // 500ms matches CSS duration
+    }, 500);
 };
+
+// Queue Panel Toggle
+const queuePanel = document.getElementById('queue-panel');
+const queuePanelToggle = document.getElementById('queue-panel-toggle');
+
+function toggleQueuePanel() {
+    if (!queuePanel || !queuePanelToggle) return;
+    const isOpen = !queuePanel.classList.contains('pointer-events-none');
+    if (isOpen) {
+        // Close
+        queuePanel.classList.add('opacity-0', 'pointer-events-none');
+        queuePanel.classList.remove('opacity-100', 'pointer-events-auto');
+        queuePanelToggle.classList.remove('text-brand-mint');
+        queuePanelToggle.classList.add('text-gray-400', 'dark:text-gray-400');
+    } else {
+        // Open
+        queuePanel.classList.remove('opacity-0', 'pointer-events-none');
+        queuePanel.classList.add('opacity-100', 'pointer-events-auto');
+        queuePanelToggle.classList.add('text-brand-mint');
+        queuePanelToggle.classList.remove('text-gray-400', 'dark:text-gray-400');
+    }
+}
+
+if (queuePanelToggle) {
+    queuePanelToggle.addEventListener('click', toggleQueuePanel);
+}
 
 expandPlayerBtn.addEventListener('click', openFullPlayer);
 
@@ -2590,10 +2732,6 @@ function initRoomSettings() {
             });
         }
     });
-    // Initial PIP state based on player visibility
-    if (fullPlayer && fullPlayer.classList.contains('hidden')) {
-        switchPIPMode(true, true);
-    }
 
     // --- Shuffle ---
     onValue(ref(db, `rooms/${roomId}/info/shuffle`), (snapshot) => {
@@ -2606,6 +2744,27 @@ function initRoomSettings() {
         repeatMode = snapshot.val() || 'all';
         updateRepeatUI(repeatMode);
     });
+
+    // --- Kiosk Mode Toggle ---
+    const kioskToggle = document.getElementById('kiosk-mode-toggle');
+    if (kioskToggle) {
+        kioskToggle.checked = isKioskEnabled;
+        kioskToggle.addEventListener('change', (e) => {
+            isKioskEnabled = e.target.checked;
+            localStorage.setItem('ejtunes_kiosk', isKioskEnabled ? 'true' : 'false');
+        });
+    }
+
+    // Auto-enter kiosk mode if URL parameter is set
+    if (isKioskEnabled) {
+        // Wait for player to be ready, then auto-enter full player
+        const waitForPlayer = setInterval(() => {
+            if (isPlayerReady) {
+                clearInterval(waitForPlayer);
+                setTimeout(() => openFullPlayer(), 500);
+            }
+        }, 200);
+    }
 }
 
 function updateToggleUI(toggleEl, isOn) {
@@ -2859,6 +3018,166 @@ checkVersion();
 })();
 
 
+
+// ==========================================
+// Kiosk Mode Functions
+// ==========================================
+
+function updateKioskUI(data) {
+    const kioskTitle = document.getElementById('kiosk-title');
+    const kioskArtist = document.getElementById('kiosk-artist');
+    const kioskRequesterName = document.getElementById('kiosk-requester-name');
+    const kioskDiscArt = document.getElementById('kiosk-disc-art');
+
+    if (!kioskTitle) return;
+
+    const title = decodeHtmlEntities(data.title) || 'Waiting...';
+    const artist = decodeHtmlEntities(data.artist) || 'System';
+
+    kioskTitle.textContent = data.status === 'idle' ? t('waiting_requests') : title;
+    kioskArtist.textContent = data.status === 'idle' ? t('add_song_msg') : artist;
+    if (kioskRequesterName) kioskRequesterName.textContent = data.requester || 'System';
+
+    // Update disc center art + background
+    if (data.videoId) {
+        const hiRes = getHighResThumbnail(data.videoId);
+        if (kioskDiscArt) kioskDiscArt.src = hiRes;
+        const kioskBgArt = document.getElementById('kiosk-bg-art');
+        if (kioskBgArt) kioskBgArt.src = hiRes;
+    }
+}
+
+function generateKioskQR() {
+    if (!roomId) return;
+    const canvas = document.getElementById('kiosk-qr-code');
+    if (!canvas) return;
+
+    const joinUrl = `${window.location.origin}/${roomId}`;
+    QRCode.toCanvas(canvas, joinUrl, {
+        width: 112,
+        margin: 1,
+        color: { dark: '#000000', light: '#ffffff' }
+    });
+}
+
+function positionKioskDisc() {
+    const jacket = document.getElementById('kiosk-jacket');
+    const disc = document.getElementById('kiosk-lp-disc');
+    const highlight = document.getElementById('kiosk-lp-highlight');
+    if (!jacket || !disc) return;
+
+    const jacketRect = jacket.getBoundingClientRect();
+    const assembly = document.getElementById('kiosk-vinyl-assembly');
+    const assemblyRect = assembly ? assembly.getBoundingClientRect() : { left: 0, top: 0 };
+
+    const discSize = jacketRect.width;
+    // Position disc so its center is at jacket's right edge
+    const discLeft = (jacketRect.left - assemblyRect.left) + jacketRect.width - (discSize / 2);
+    const discTop = (jacketRect.top - assemblyRect.top) + (jacketRect.height / 2) - (discSize / 2);
+
+    disc.style.width = discSize + 'px';
+    disc.style.height = discSize + 'px';
+    disc.style.left = discLeft + 'px';
+    disc.style.top = discTop + 'px';
+
+    if (highlight) {
+        highlight.style.width = discSize + 'px';
+        highlight.style.height = discSize + 'px';
+        highlight.style.left = discLeft + 'px';
+        highlight.style.top = discTop + 'px';
+    }
+}
+
+function onKioskResize() {
+    if (!isKioskActive) return;
+    setTimeout(() => {
+        switchYTPlayerMode('kiosk');
+        positionKioskDisc();
+    }, 100);
+}
+
+// Wake Lock API
+async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('[Kiosk] Wake Lock acquired');
+            wakeLock.addEventListener('release', () => {
+                console.log('[Kiosk] Wake Lock released');
+            });
+        } catch (err) {
+            console.warn('[Kiosk] Wake Lock failed:', err.message);
+        }
+    }
+}
+
+function releaseWakeLock() {
+    if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+    }
+}
+
+// Re-acquire wake lock on visibility change (tab switch back)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && isKioskActive && !wakeLock) {
+        requestWakeLock();
+    }
+});
+
+// Kiosk interaction lockdown
+function setupKioskListeners() {
+    document.addEventListener('touchmove', preventKioskTouch, { passive: false });
+    document.addEventListener('contextmenu', preventKioskContext);
+
+    // 5-tap exit zone
+    const exitZone = document.getElementById('kiosk-exit-zone');
+    if (exitZone) {
+        exitZone.addEventListener('click', handleKioskExitTap);
+    }
+}
+
+function teardownKioskListeners() {
+    document.removeEventListener('touchmove', preventKioskTouch);
+    document.removeEventListener('contextmenu', preventKioskContext);
+
+    const exitZone = document.getElementById('kiosk-exit-zone');
+    if (exitZone) {
+        exitZone.removeEventListener('click', handleKioskExitTap);
+    }
+
+    kioskExitTapCount = 0;
+    if (kioskExitTapTimer) {
+        clearTimeout(kioskExitTapTimer);
+        kioskExitTapTimer = null;
+    }
+}
+
+function preventKioskTouch(e) {
+    if (isKioskActive) e.preventDefault();
+}
+
+function preventKioskContext(e) {
+    if (isKioskActive) e.preventDefault();
+}
+
+function handleKioskExitTap() {
+    kioskExitTapCount++;
+
+    if (kioskExitTapTimer) clearTimeout(kioskExitTapTimer);
+    kioskExitTapTimer = setTimeout(() => {
+        kioskExitTapCount = 0;
+    }, 3000); // Reset after 3 seconds of no taps
+
+    if (kioskExitTapCount >= 5) {
+        kioskExitTapCount = 0;
+        if (kioskExitTapTimer) {
+            clearTimeout(kioskExitTapTimer);
+            kioskExitTapTimer = null;
+        }
+        closeFullPlayer();
+    }
+}
 
 function updateVolumeFill(rangeInput) {
     if (!rangeInput) return;
