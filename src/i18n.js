@@ -80,7 +80,8 @@ const resources = {
         exit_kiosk_desc: "Return to the normal player view.",
         cancel_btn: "Cancel",
         exit_btn: "Exit",
-        requested_by: "Requested by"
+        requested_by: "Requested by",
+        song_too_long: "Songs longer than {minutes} minutes are not allowed"
     },
     ko: {
         app_title: "EJTunes",
@@ -162,7 +163,8 @@ const resources = {
         exit_kiosk_desc: "일반 플레이어 화면으로 돌아갑니다.",
         cancel_btn: "취소",
         exit_btn: "나가기",
-        requested_by: "신청"
+        requested_by: "신청",
+        song_too_long: "{minutes}분 이상의 노래는 추가할 수 없습니다"
     }
 };
 

@@ -1678,7 +1678,16 @@ async function addToQueue(video) {
             console.warn('Could not fetch video duration', e);
         }
 
-        const requesterName = (currentUser.uid === currentRoomCreatorId) ? 'Host' : (currentUser.displayName || 'Anonymous');
+        // Duration limit for non-host users (10 minutes)
+        const MAX_SONG_DURATION = 600;
+        const isHost = currentUser.uid === currentRoomCreatorId;
+        if (!isHost && duration > 0 && duration > MAX_SONG_DURATION) {
+            const maxMin = Math.floor(MAX_SONG_DURATION / 60);
+            toast.show(t('song_too_long', { minutes: maxMin }), { isError: true });
+            return;
+        }
+
+        const requesterName = isHost ? 'Host' : (currentUser.displayName || 'Anonymous');
         const queueRef = ref(db, `rooms/${currentRoomId}/queue`);
         await push(queueRef, {
             videoId: video.id,
