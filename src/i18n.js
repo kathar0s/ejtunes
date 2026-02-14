@@ -91,7 +91,8 @@ const resources = {
         round_robin_enabled: "Fair Queue (Round Robin) enabled",
         round_robin_disabled: "Fair Queue (Round Robin) disabled",
         round_robin_label: "Fair Queue (Round Robin)",
-        round_robin_hint: "Songs alternate between users"
+        round_robin_hint: "Songs alternate between users",
+        empty_queue_play: "Search for songs and add them to the queue first"
     },
     ko: {
         app_title: "EJTunes",
@@ -184,7 +185,8 @@ const resources = {
         round_robin_enabled: "공정 대기열 (라운드 로빈) 활성화",
         round_robin_disabled: "공정 대기열 (라운드 로빈) 비활성화",
         round_robin_label: "공정 대기열 (라운드 로빈)",
-        round_robin_hint: "사용자별로 곡을 번갈아 재생합니다"
+        round_robin_hint: "사용자별로 곡을 번갈아 재생합니다",
+        empty_queue_play: "노래를 검색해서 재생목록에 추가해주세요"
     }
 };
 

@@ -1978,6 +1978,14 @@ if (playPauseBtn) {
     playPauseBtn.addEventListener('click', async () => {
         if (!canControlRoom()) return;
         if (!currentRoomId) return;
+        // If idle (no song playing), check if queue has songs
+        if (currentStatus === 'idle') {
+            const queueSnap = await get(ref(db, `rooms/${currentRoomId}/queue`));
+            if (!queueSnap.exists() || Object.keys(queueSnap.val()).length === 0) {
+                toast.show(t('empty_queue_play'));
+                return;
+            }
+        }
         const newStatus = currentStatus === 'playing' ? 'paused' : 'playing';
         update(ref(db, `rooms/${currentRoomId}/current_playback`), { status: newStatus });
         updateLastController();

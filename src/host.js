@@ -1500,10 +1500,26 @@ function initListeners() {
     });
 
     const queueRef = ref(db, `rooms/${roomId}/queue`);
+    let isFirstQueueLoad = true;
     onValue(queueRef, (snapshot) => {
         if (isDragging) return;
         currentQueueSnapshot = snapshot;
         renderHostQueue();
+
+        // Auto-open queue panel on first load if queue is empty
+        if (isFirstQueueLoad) {
+            isFirstQueueLoad = false;
+            if (!snapshot.exists() || Object.keys(snapshot.val()).length === 0) {
+                const qp = document.getElementById('queue-panel');
+                const qpt = document.getElementById('queue-panel-toggle');
+                if (qp && qpt) {
+                    qp.classList.remove('opacity-0', 'pointer-events-none');
+                    qp.classList.add('opacity-100', 'pointer-events-auto');
+                    qpt.classList.add('text-brand-mint');
+                    qpt.classList.remove('text-gray-400', 'dark:text-gray-400');
+                }
+            }
+        }
     });
 
     // Listen for Commands (Restart, Previous, Next)
