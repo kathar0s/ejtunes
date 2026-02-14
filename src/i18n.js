@@ -81,7 +81,17 @@ const resources = {
         cancel_btn: "Cancel",
         exit_btn: "Exit",
         requested_by: "Requested by",
-        song_too_long: "Songs longer than {minutes} minutes are not allowed"
+        song_too_long: "Songs longer than {minutes} minutes are not allowed",
+        skip_vote: "Skip Vote",
+        skip_vote_cast: "Vote to skip recorded ({current}/{threshold})",
+        skip_vote_cancelled: "Skip vote cancelled",
+        skip_vote_skipping: "Enough votes! Skipping...",
+        queue_limit_reached: "You can only have {max} songs in the queue at a time",
+        song_position_feedback: "Your song is at position {position} in the queue",
+        round_robin_enabled: "Fair Queue (Round Robin) enabled",
+        round_robin_disabled: "Fair Queue (Round Robin) disabled",
+        round_robin_label: "Fair Queue (Round Robin)",
+        round_robin_hint: "Songs alternate between users"
     },
     ko: {
         app_title: "EJTunes",
@@ -164,7 +174,17 @@ const resources = {
         cancel_btn: "취소",
         exit_btn: "나가기",
         requested_by: "신청",
-        song_too_long: "{minutes}분 이상의 노래는 추가할 수 없습니다"
+        song_too_long: "{minutes}분 이상의 노래는 추가할 수 없습니다",
+        skip_vote: "스킵 투표",
+        skip_vote_cast: "스킵 투표가 등록되었습니다 ({current}/{threshold})",
+        skip_vote_cancelled: "스킵 투표가 취소되었습니다",
+        skip_vote_skipping: "투표 충족! 다음 곡으로 넘어갑니다...",
+        queue_limit_reached: "대기열에 최대 {max}곡까지만 추가할 수 있습니다",
+        song_position_feedback: "대기열 {position}번째에 추가되었습니다",
+        round_robin_enabled: "공정 대기열 (라운드 로빈) 활성화",
+        round_robin_disabled: "공정 대기열 (라운드 로빈) 비활성화",
+        round_robin_label: "공정 대기열 (라운드 로빈)",
+        round_robin_hint: "사용자별로 곡을 번갈아 재생합니다"
     }
 };
 

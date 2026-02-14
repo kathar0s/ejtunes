@@ -20,6 +20,11 @@ let currentVideoId = null; // Track current video for listener cleanup
 let sortableInstance = null; // Sortable instance for queue reordering
 let isDragging = false; // Drag lock flag
 let isHostMissing = false; // Track host connection state globally
+const SKIP_VOTE_THRESHOLD = 3;
+const MAX_SONGS_PER_USER = 3;
+let hasVotedToSkip = false;
+let skipVoteListenerRef = null;
+let roundRobinEnabled = false;
 
 const YOUTUBE_API_KEY = 'AIzaSyBuN6OIAjU8C2q37vIhIZkY_l8hg3R_z9g';
 const INVIDIOUS_INSTANCES = [
@@ -515,6 +520,7 @@ async function joinRoom(roomId, shouldPushState = true) {
 
 document.getElementById('leave-room-btn').addEventListener('click', () => {
     if (currentRoomId) {
+        cleanupSkipVoteListener();
         off(ref(db, `rooms/${currentRoomId}/info/hostOnline`));
         off(ref(db, `rooms/${currentRoomId}/current_playback`));
         off(ref(db, `rooms/${currentRoomId}/queue`));
@@ -621,6 +627,14 @@ function initRoomListeners() {
             setRemoteProgressBar(currentSongData);
         }
     });
+
+    // Listen for Round Robin setting
+    onValue(ref(db, `rooms/${currentRoomId}/info/roundRobin`), (snapshot) => {
+        roundRobinEnabled = snapshot.val() === true;
+    });
+
+    // Start skip vote listener
+    initSkipVoteListener();
 }
 
 // Volume Control with fill update
@@ -795,6 +809,9 @@ function updateNowPlaying(data) {
                         }
                     });
                 }
+
+                // Reset skip vote state on song change
+                hasVotedToSkip = false;
             }
         } else {
             // Idle state: cleanup
@@ -807,6 +824,7 @@ function updateNowPlaying(data) {
             likeIconEl.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>`;
         }
 
+        currentStatus = data.status;
         currentStatus = data.status;
         if (data.status === 'playing' || data.status === 'paused') {
             indicatorEl.classList.remove('hidden');
@@ -823,6 +841,11 @@ function updateNowPlaying(data) {
                 if (remotePlayIcon) remotePlayIcon.classList.remove('hidden');
                 if (remotePauseIcon) remotePauseIcon.classList.add('hidden');
             }
+
+            const likeBtn = document.getElementById('like-btn');
+            if (likeBtn) likeBtn.classList.remove('hidden');
+            const skipVoteBtnEl = document.getElementById('skip-vote-btn');
+            if (skipVoteBtnEl) skipVoteBtnEl.classList.remove('hidden');
         } else {
             indicatorEl.classList.add('hidden');
             if (remotePlayIcon) remotePlayIcon.classList.remove('hidden');
@@ -853,6 +876,11 @@ function updateNowPlaying(data) {
         currentStatus = 'idle';
         if (remotePlayIcon) remotePlayIcon.classList.remove('hidden');
         if (remotePauseIcon) remotePauseIcon.classList.add('hidden');
+
+        const likeBtn = document.getElementById('like-btn');
+        if (likeBtn) likeBtn.classList.add('hidden');
+        const skipVoteBtnEl = document.getElementById('skip-vote-btn');
+        if (skipVoteBtnEl) skipVoteBtnEl.classList.add('hidden');
 
         updateQueueVisuals(null);
         setRemoteProgressBar(null);
@@ -1578,7 +1606,7 @@ async function fetchVideoInfo(videoId) {
 async function performSearch(query) {
     searchResults.classList.remove('hidden');
     try {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&topicId=/m/04rlf&key=${YOUTUBE_API_KEY}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
@@ -1586,8 +1614,29 @@ async function performSearch(query) {
                 id: item.id.videoId,
                 title: decodeHtmlEntities(item.snippet.title),
                 artist: decodeHtmlEntities(item.snippet.channelTitle),
-                thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url
+                thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url,
+                duration: 0
             }));
+
+            // Batch fetch durations
+            try {
+                const videoIds = results.map(r => r.id).join(',');
+                const durationRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`);
+                if (durationRes.ok) {
+                    const durationData = await durationRes.json();
+                    const durationMap = {};
+                    durationData.items.forEach(item => {
+                        const match = item.contentDetails.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+                        if (match) {
+                            durationMap[item.id] = (parseInt(match[1] || 0) * 3600) + (parseInt(match[2] || 0) * 60) + parseInt(match[3] || 0);
+                        }
+                    });
+                    results.forEach(r => { if (durationMap[r.id]) r.duration = durationMap[r.id]; });
+                }
+            } catch (e) {
+                console.warn('Could not fetch video durations', e);
+            }
+
             displaySearchResults(results);
             return;
         }
@@ -1602,13 +1651,23 @@ async function performSearch(query) {
                     id: item.videoId,
                     title: item.title,
                     artist: item.author,
-                    thumb: item.videoThumbnails ? item.videoThumbnails[1].url : ''
+                    thumb: item.videoThumbnails ? item.videoThumbnails[1].url : '',
+                    duration: item.lengthSeconds || 0
                 }));
                 displaySearchResults(results);
                 return;
             }
         } catch (e) { }
     }
+}
+
+function formatSearchDuration(seconds) {
+    if (!seconds || seconds <= 0) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function displaySearchResults(results) {
@@ -1622,6 +1681,7 @@ function displaySearchResults(results) {
     results.forEach(video => {
         const div = document.createElement('div');
         div.className = 'flex items-center gap-3 p-3 hover:bg-white/10 transition cursor-pointer border-b border-white/5 last:border-0';
+        const durationText = formatSearchDuration(video.duration);
         div.innerHTML = `
             <div class="w-12 h-12 bg-gray-800 rounded overflow-hidden flex-shrink-0">
                 <img src="${video.thumb}" class="w-full h-full object-cover">
@@ -1630,6 +1690,7 @@ function displaySearchResults(results) {
                 <h4 class="font-bold text-sm truncate text-gray-900 dark:text-white">${video.title}</h4>
                 <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${video.artist}</p>
             </div>
+            ${durationText ? `<span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 font-mono">${durationText}</span>` : ''}
         `;
 
         // Click entire row to add
@@ -1639,7 +1700,7 @@ function displaySearchResults(results) {
                 title: video.title,
                 artist: video.artist,
                 thumb: video.thumb, // Fixed key name for addToQueue
-                duration: 0
+                duration: video.duration || 0
             });
             // Close search UI immediately
             searchResults.classList.add('hidden');
@@ -1649,6 +1710,117 @@ function displaySearchResults(results) {
 
         searchResults.appendChild(div);
     });
+}
+
+// === SKIP VOTE SYSTEM ===
+function initSkipVoteListener() {
+    if (skipVoteListenerRef) {
+        off(ref(db, `rooms/${currentRoomId}/skip_votes`));
+        skipVoteListenerRef = null;
+    }
+    if (!currentRoomId) return;
+
+    const skipVotesRef = ref(db, `rooms/${currentRoomId}/skip_votes`);
+    skipVoteListenerRef = true;
+
+    const skipVoteBtn = document.getElementById('skip-vote-btn');
+    const skipVoteIcon = document.getElementById('skip-vote-icon');
+    const skipVoteCount = document.getElementById('skip-vote-count');
+
+    onValue(skipVotesRef, (snapshot) => {
+        const votes = snapshot.val();
+        const count = votes ? Object.keys(votes).length : 0;
+
+        if (skipVoteCount) skipVoteCount.textContent = `${count}/${SKIP_VOTE_THRESHOLD}`;
+
+        if (currentUser && votes && votes[currentUser.uid]) {
+            hasVotedToSkip = true;
+            if (skipVoteIcon) {
+                skipVoteIcon.setAttribute('fill', 'currentColor');
+                skipVoteIcon.classList.remove('text-gray-400');
+                skipVoteIcon.classList.add('text-orange-500');
+            }
+        } else {
+            hasVotedToSkip = false;
+            if (skipVoteIcon) {
+                skipVoteIcon.setAttribute('fill', 'none');
+                skipVoteIcon.classList.remove('text-orange-500');
+                skipVoteIcon.classList.add('text-gray-400');
+            }
+        }
+    });
+}
+
+function cleanupSkipVoteListener() {
+    if (skipVoteListenerRef && currentRoomId) {
+        off(ref(db, `rooms/${currentRoomId}/skip_votes`));
+        skipVoteListenerRef = null;
+    }
+}
+
+async function castSkipVote() {
+    if (!currentRoomId || !currentUser) return;
+
+    try {
+        const voteRef = ref(db, `rooms/${currentRoomId}/skip_votes/${currentUser.uid}`);
+        if (hasVotedToSkip) {
+            await set(voteRef, null);
+            toast.show(t('skip_vote_cancelled'));
+        } else {
+            await set(voteRef, true);
+            const snapshot = await get(ref(db, `rooms/${currentRoomId}/skip_votes`));
+            const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+            toast.show(t('skip_vote_cast', { current: count, threshold: SKIP_VOTE_THRESHOLD }));
+        }
+    } catch (e) {
+        console.error('Skip vote failed:', e);
+    }
+}
+
+// === ROUND ROBIN: Insert-Only Fair Position ===
+function findFairInsertPosition(sortedQueue, newRequesterId) {
+    if (sortedQueue.length === 0) return Date.now();
+
+    // Count songs per requester at each gap position
+    let bestGap = sortedQueue.length; // default: end of queue
+    let bestDeficit = -Infinity;
+    const requesterCounts = {};
+    const totalRequesters = new Set(sortedQueue.map(s => s.requesterId)).size;
+
+    for (let i = 0; i <= sortedQueue.length; i++) {
+        // Count how many songs this requester has before position i
+        const myCount = Object.values(requesterCounts).length === 0 ? 0 :
+            (requesterCounts[newRequesterId] || 0);
+        // Count average songs per requester before position i
+        const totalSongs = Object.values(requesterCounts).reduce((a, b) => a + b, 0);
+        const avgCount = totalRequesters > 0 ? totalSongs / (totalRequesters + (requesterCounts[newRequesterId] ? 0 : 1)) : 0;
+        const deficit = avgCount - myCount;
+
+        if (deficit > bestDeficit) {
+            bestDeficit = deficit;
+            bestGap = i;
+        }
+
+        // Update counts for next position
+        if (i < sortedQueue.length) {
+            const rid = sortedQueue[i].requesterId;
+            requesterCounts[rid] = (requesterCounts[rid] || 0) + 1;
+        }
+    }
+
+    // Calculate order value for the gap
+    if (bestGap === 0) {
+        // Insert before first song
+        return (sortedQueue[0].order || 0) - 1000;
+    } else if (bestGap >= sortedQueue.length) {
+        // Insert after last song
+        return (sortedQueue[sortedQueue.length - 1].order || 0) + 1000;
+    } else {
+        // Insert between two songs
+        const before = sortedQueue[bestGap - 1].order || 0;
+        const after = sortedQueue[bestGap].order || 0;
+        return (before + after) / 2;
+    }
 }
 
 async function addToQueue(video) {
@@ -1687,8 +1859,36 @@ async function addToQueue(video) {
             return;
         }
 
+        // Per-user queue limit (host exempt)
+        if (!isHost) {
+            const queueSnap = await get(ref(db, `rooms/${currentRoomId}/queue`));
+            if (queueSnap.exists()) {
+                const userSongCount = Object.values(queueSnap.val()).filter(
+                    s => s.requesterId === currentUser.uid
+                ).length;
+                if (userSongCount >= MAX_SONGS_PER_USER) {
+                    toast.show(t('queue_limit_reached', { max: MAX_SONGS_PER_USER }), { isError: true });
+                    return;
+                }
+            }
+        }
+
         const requesterName = isHost ? 'Host' : (currentUser.displayName || 'Anonymous');
         const queueRef = ref(db, `rooms/${currentRoomId}/queue`);
+
+        // Calculate order based on Round Robin setting
+        let orderValue = Date.now();
+        if (roundRobinEnabled) {
+            const queueSnap = await get(queueRef);
+            if (queueSnap.exists()) {
+                const songs = queueSnap.val();
+                const sortedQueue = Object.keys(songs).map(key => ({
+                    key, ...songs[key]
+                })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+                orderValue = findFairInsertPosition(sortedQueue, currentUser.uid);
+            }
+        }
+
         await push(queueRef, {
             videoId: video.id,
             title: video.title,
@@ -1698,9 +1898,25 @@ async function addToQueue(video) {
             requesterId: currentUser.uid,
             duration: duration,
             createdAt: serverTimestamp(),
-            order: Date.now(),
+            order: orderValue,
         });
-        toast.show(t('added_to_queue'));
+
+        if (roundRobinEnabled) {
+            // Calculate and show position feedback
+            const updatedSnap = await get(queueRef);
+            if (updatedSnap.exists()) {
+                const allSongs = updatedSnap.val();
+                const sorted = Object.keys(allSongs).map(key => ({
+                    key, ...allSongs[key]
+                })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+                const position = sorted.findIndex(s => s.requesterId === currentUser.uid && Math.abs(s.order - orderValue) < 0.01);
+                toast.show(t('song_position_feedback', { position: (position !== -1 ? position + 1 : sorted.length) }));
+            } else {
+                toast.show(t('added_to_queue'));
+            }
+        } else {
+            toast.show(t('added_to_queue'));
+        }
     } catch (e) {
         toast.show(t('failed_add'), { isError: true });
     }
@@ -1741,6 +1957,12 @@ function sendCommand(action) {
     if (!currentRoomId || isHostMissing) return;
     update(ref(db, `rooms/${currentRoomId}/commands`), { action: action, timestamp: serverTimestamp() });
     updateLastController();
+}
+
+// Skip Vote button
+const skipVoteBtn = document.getElementById('skip-vote-btn');
+if (skipVoteBtn) {
+    skipVoteBtn.addEventListener('click', castSkipVote);
 }
 
 const skipBtn = document.getElementById('skip-btn');

@@ -276,6 +276,20 @@
                     </label>
                 </div>
 
+                <!-- Round Robin Toggle -->
+                <div class="flex items-center justify-between mb-4 p-3 bg-black/5 dark:bg-white/5 rounded-lg">
+                    <div class="flex-1 text-left">
+                        <span class="text-sm text-gray-600 dark:text-gray-300 block" data-i18n="round_robin_label">Fair Queue (Round Robin)</span>
+                        <span class="text-xs text-gray-500 block" data-i18n="round_robin_hint">Songs alternate between users</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-3">
+                        <input type="checkbox" id="round-robin-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-mint transition-all duration-300
+                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                            peer-checked:after:translate-x-5"></div>
+                    </label>
+                </div>
+
                 <!-- Private Room Toggle -->
                 <div class="flex items-center justify-between mb-4 p-3 bg-black/5 dark:bg-white/5 rounded-lg">
                     <div class="flex-1 text-left">

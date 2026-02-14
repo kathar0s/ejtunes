@@ -434,6 +434,14 @@
                             data-i18n="add_song_msg">Add a song
                             to start</p>
                     </div>
+                    <button id="skip-vote-btn"
+                        class="hidden flex flex-col items-center p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition"
+                        title="Vote to skip">
+                        <svg id="skip-vote-icon" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                        </svg>
+                        <span id="skip-vote-count" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">0/3</span>
+                    </button>
                     <button id="like-btn"
                         class="flex flex-col items-center p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition">
                         <span id="like-icon" class="text-2xl">🤍</span>

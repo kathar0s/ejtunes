@@ -172,6 +172,8 @@ const INVIDIOUS_INSTANCES = [
     'https://invidious.snopyta.org',
     'https://yewtu.be'
 ];
+const SKIP_VOTE_THRESHOLD = 3;
+let roundRobinEnabled = false;
 
 // Elements
 const setupScreen = document.getElementById('setup-screen');
@@ -1096,6 +1098,8 @@ async function playSong(song) {
         queueKey: song.key
     };
     await update(ref(db), updates);
+    // Clear skip votes when new song starts
+    set(ref(db, `rooms/${roomId}/skip_votes`), null);
     loadAndPlay(song.videoId);
 }
 
@@ -1536,6 +1540,36 @@ function initListeners() {
             }
         }
     });
+
+    // Listen for Skip Votes - auto-skip when threshold reached
+    const skipVotesRef = ref(db, `rooms/${roomId}/skip_votes`);
+    onValue(skipVotesRef, (snapshot) => {
+        if (!isAmILeader()) return;
+        const votes = snapshot.val();
+        const count = votes ? Object.keys(votes).length : 0;
+        if (count >= SKIP_VOTE_THRESHOLD) {
+            console.log(`[Host] Skip vote threshold reached (${count}/${SKIP_VOTE_THRESHOLD}), skipping...`);
+            set(skipVotesRef, null).then(() => {
+                playNextSong();
+            });
+        }
+    });
+
+    // Listen for Round Robin setting
+    const roundRobinRef = ref(db, `rooms/${roomId}/info/roundRobin`);
+    onValue(roundRobinRef, (snapshot) => {
+        roundRobinEnabled = snapshot.val() === true;
+        const roundRobinToggle = document.getElementById('round-robin-toggle');
+        if (roundRobinToggle) roundRobinToggle.checked = roundRobinEnabled;
+    });
+
+    // Round Robin toggle handler
+    const roundRobinToggleEl = document.getElementById('round-robin-toggle');
+    if (roundRobinToggleEl) {
+        roundRobinToggleEl.addEventListener('change', (e) => {
+            set(ref(db, `rooms/${roomId}/info/roundRobin`), e.target.checked);
+        });
+    }
 
     // Listen for Shuffle state changes
     const shuffleRef = ref(db, `rooms/${roomId}/info/shuffle`);
@@ -2934,6 +2968,44 @@ async function performHostSearch(query, container, inputEl) {
     } catch (e) { console.error(e); }
 }
 
+// === ROUND ROBIN: Insert-Only Fair Position ===
+function findFairInsertPosition(sortedQueue, newRequesterId) {
+    if (sortedQueue.length === 0) return Date.now();
+
+    let bestGap = sortedQueue.length;
+    let bestDeficit = -Infinity;
+    const requesterCounts = {};
+    const totalRequesters = new Set(sortedQueue.map(s => s.requesterId)).size;
+
+    for (let i = 0; i <= sortedQueue.length; i++) {
+        const myCount = Object.values(requesterCounts).length === 0 ? 0 :
+            (requesterCounts[newRequesterId] || 0);
+        const totalSongs = Object.values(requesterCounts).reduce((a, b) => a + b, 0);
+        const avgCount = totalRequesters > 0 ? totalSongs / (totalRequesters + (requesterCounts[newRequesterId] ? 0 : 1)) : 0;
+        const deficit = avgCount - myCount;
+
+        if (deficit > bestDeficit) {
+            bestDeficit = deficit;
+            bestGap = i;
+        }
+
+        if (i < sortedQueue.length) {
+            const rid = sortedQueue[i].requesterId;
+            requesterCounts[rid] = (requesterCounts[rid] || 0) + 1;
+        }
+    }
+
+    if (bestGap === 0) {
+        return (sortedQueue[0].order || 0) - 1000;
+    } else if (bestGap >= sortedQueue.length) {
+        return (sortedQueue[sortedQueue.length - 1].order || 0) + 1000;
+    } else {
+        const before = sortedQueue[bestGap - 1].order || 0;
+        const after = sortedQueue[bestGap].order || 0;
+        return (before + after) / 2;
+    }
+}
+
 async function addToHostQueue(video) {
     if (!roomId || !currentUser) {
         console.error("Missing Room ID or User", { roomId, currentUser });
@@ -2963,6 +3035,20 @@ async function addToHostQueue(video) {
         }
 
         const queueRef = ref(db, `rooms/${roomId}/queue`);
+
+        // Calculate order based on Round Robin setting
+        let orderValue = Date.now();
+        if (roundRobinEnabled) {
+            const queueSnap = await get(queueRef);
+            if (queueSnap.exists()) {
+                const songs = queueSnap.val();
+                const sortedQueue = Object.keys(songs).map(key => ({
+                    key, ...songs[key]
+                })).sort((a, b) => (a.order !== undefined ? a.order : a.createdAt) - (b.order !== undefined ? b.order : b.createdAt));
+                orderValue = findFairInsertPosition(sortedQueue, currentUser.uid);
+            }
+        }
+
         const newRef = await push(queueRef, {
             videoId: video.id,
             title: video.title,
@@ -2972,7 +3058,7 @@ async function addToHostQueue(video) {
             requesterId: currentUser.uid,
             duration: duration,
             createdAt: serverTimestamp(),
-            order: Date.now(),
+            order: orderValue,
         });
 
         const snap = await get(ref(db, `rooms/${roomId}/current_playback`));
