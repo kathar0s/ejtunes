@@ -2592,6 +2592,17 @@ const togglePlay = () => {
         if (player.getPlayerState() === 1) {
             player.pauseVideo();
         } else {
+            // If no song is loaded, try to play first song from queue
+            if (!currentSongData || !currentSongData.videoId) {
+                get(ref(db, `rooms/${roomId}/queue`)).then(snapshot => {
+                    if (!snapshot.exists() || Object.keys(snapshot.val()).length === 0) {
+                        toast.show(t('empty_queue_play'));
+                        return;
+                    }
+                    playNextSong();
+                });
+                return;
+            }
             isPlayIntended = true;
             player.playVideo();
         }
