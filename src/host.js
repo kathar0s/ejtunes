@@ -1869,7 +1869,7 @@ function renderHostQueue() {
                     const updates = {};
                     items.forEach((item, index) => {
                         const key = item.dataset.key;
-                        updates[`rooms / ${roomId} /queue/${key}/order`] = index;
+                        updates[`rooms/${roomId}/queue/${key}/order`] = index;
                     });
                     update(ref(db), updates).then(() => {
                         setTimeout(() => { isDragging = false; }, 500);
