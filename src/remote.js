@@ -6,6 +6,7 @@ import { themeManager } from './theme-manager';
 import { decodeHtmlEntities, toast } from './utils';
 import Sortable from 'sortablejs';
 import { APP_VERSION } from './version';
+import { initVersionChecker } from './version-checker';
 
 let currentUser = null;
 let currentRoomId = null;
@@ -32,6 +33,10 @@ const INVIDIOUS_INSTANCES = [
     'https://invidious.snopyta.org',
     'https://yewtu.be'
 ];
+
+// Version display
+document.getElementById('app-version-select').textContent = `v${APP_VERSION}`;
+document.getElementById('app-version-app').textContent = `v${APP_VERSION}`;
 
 // Elements
 const loadingScreen = document.getElementById('loading-screen');
@@ -2099,51 +2104,8 @@ if (volSlider) {
     volSlider.removeEventListener('input', remoteVolumeFn); // Prevent duplicates
     volSlider.addEventListener('input', remoteVolumeFn);
 }
-// Version checking logic
-function checkVersion() {
-    const versionRef = ref(db, 'app_settings/version');
-    onValue(versionRef, (snapshot) => {
-        const latestVersion = snapshot.val();
-        if (latestVersion && isNewerVersion(latestVersion, APP_VERSION)) {
-            showUpdateBanner(latestVersion);
-        }
-    });
-}
-
-function isNewerVersion(latest, current) {
-    const latestParts = latest.split('.').map(Number);
-    const currentParts = current.split('.').map(Number);
-    for (let i = 0; i < 3; i++) {
-        if (latestParts[i] > currentParts[i]) return true;
-        if (latestParts[i] < currentParts[i]) return false;
-    }
-    return false;
-}
-
-function showUpdateBanner(newVersion) {
-    if (document.getElementById('update-notification-banner')) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'update-notification-banner';
-    banner.className = 'update-banner bottom';
-    banner.innerHTML = `
-        <div class="flex-1 text-sm text-gray-200">
-            <span class="font-bold text-brand-mint">${t('update_available')}</span> 
-            <span class="text-xs opacity-70 block">${t('update_desc', { version: newVersion })}</span>
-        </div>
-        <button id="refresh-app-btn" class="bg-brand-mint hover:bg-brand-mint/80 text-black px-4 py-1.5 rounded-full text-xs font-bold transition-all">
-            ${t('refresh')}
-        </button>
-    `;
-    document.body.appendChild(banner);
-
-    document.getElementById('refresh-app-btn').addEventListener('click', () => {
-        window.location.reload();
-    });
-}
-
 // Call version check on init
-checkVersion();
+initVersionChecker();
 
 // Error Page Theme Toggle Initialization
 (function initErrorThemeToggle() {
