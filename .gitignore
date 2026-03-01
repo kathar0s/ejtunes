@@ -16,6 +16,10 @@ dist-ssr
 !.env.example
 
 
+# Claude Code / OMC
+.omc/
+CLAUDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -29,11 +29,12 @@ export function getHighResThumbnail(videoId) {
  */
 export class ToastManager {
     constructor() {
-        // We'll create container on demand or reuse existing
+        this._currentToast = null;
+        this._dismissTimer = null;
     }
 
     show(message, options = {}) {
-        const { duration = 5000, onUndo = null, undoText = 'UNDO', isError = false } = options;
+        const { duration = 10000, onUndo = null, undoText = 'UNDO', isError = false } = options;
 
         let container = document.getElementById('toast-container');
         if (!container) {
@@ -41,6 +42,15 @@ export class ToastManager {
             container.id = 'toast-container';
             container.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 w-full max-w-[95vw] md:max-w-md pointer-events-none px-4';
             document.body.appendChild(container);
+        }
+
+        // Remove existing toast immediately
+        if (this._currentToast && this._currentToast.parentElement) {
+            this._currentToast.remove();
+        }
+        if (this._dismissTimer) {
+            clearTimeout(this._dismissTimer);
+            this._dismissTimer = null;
         }
 
         const toast = document.createElement('div');
@@ -62,15 +72,28 @@ export class ToastManager {
             toast.appendChild(undoBtn);
         }
 
+        // Close button
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'cursor-pointer flex-shrink-0 ml-1 opacity-60 hover:opacity-100 transition-opacity';
+        closeBtn.textContent = '\u2715';
+        closeBtn.onclick = () => this.dismiss(toast);
+        toast.appendChild(closeBtn);
+
         container.appendChild(toast);
+        this._currentToast = toast;
 
         // Auto dismiss
-        setTimeout(() => {
+        this._dismissTimer = setTimeout(() => {
             this.dismiss(toast);
         }, duration);
     }
 
     dismiss(toast) {
+        if (this._dismissTimer) {
+            clearTimeout(this._dismissTimer);
+            this._dismissTimer = null;
+        }
+        this._currentToast = null;
         toast.classList.add('opacity-0', 'translate-y-2');
         setTimeout(() => {
             if (toast.parentElement) toast.remove();
