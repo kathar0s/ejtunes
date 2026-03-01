@@ -1252,25 +1252,42 @@ function renderQueue() {
 
         // Events
         let startX = 0;
+        let startY = 0;
         let currentX = 0;
         let isSwiping = false;
+        let directionLocked = false;
         const deleteThreshold = -100;
 
-        const handleStart = (clientX, target) => {
+        const handleStart = (clientX, clientY, target) => {
             if (!checkCanDelete()) return;
             if (target && target.closest('.drag-handle')) return;
-            // Don't swipe if dragging sortable? handled by sortable?
-            // "isDragging" global var from remote.js
             if (typeof isDragging !== 'undefined' && isDragging) return;
 
             startX = clientX;
+            startY = clientY;
             isSwiping = true;
+            directionLocked = false;
             el.style.transition = 'none';
         };
 
-        const handleMove = (clientX) => {
+        const handleMove = (clientX, clientY) => {
             if (!isSwiping) return;
-            currentX = clientX - startX;
+            const dx = clientX - startX;
+            const dy = clientY - startY;
+
+            if (!directionLocked) {
+                if (Math.abs(dy) > Math.abs(dx)) {
+                    isSwiping = false;
+                    return;
+                }
+                if (Math.abs(dx) >= 10) {
+                    directionLocked = true;
+                } else {
+                    return;
+                }
+            }
+
+            currentX = dx;
             if (currentX < 0) {
                 el.style.transform = `translateX(${Math.max(currentX, -150)}px)`;
             }
@@ -1306,14 +1323,14 @@ function renderQueue() {
             currentX = 0;
         };
 
-        el.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target), { passive: true });
-        el.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), { passive: true });
+        el.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.touches[0].clientY, e.target), { passive: true });
+        el.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
         el.addEventListener('touchend', handleEnd);
 
         el.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
-            handleStart(e.clientX, e.target);
-            const onMouseMove = (me) => handleMove(me.clientX);
+            handleStart(e.clientX, e.clientY, e.target);
+            const onMouseMove = (me) => handleMove(me.clientX, me.clientY);
             const onMouseUp = () => {
                 handleEnd();
                 document.removeEventListener('mousemove', onMouseMove);
