@@ -447,7 +447,7 @@ async function joinRoom(roomId, shouldPushState = true) {
 
     const adminControls = document.getElementById('admin-controls');
 
-    // Check sharedControl setting for showing admin controls
+    // Check isSharedControl setting for showing admin controls
     const adminOverlay = document.getElementById('admin-overlay');
 
     const updateAdminControlsVisibility = (sharedControl) => {
@@ -498,12 +498,12 @@ async function joinRoom(roomId, shouldPushState = true) {
     };
 
     // Initial check
-    get(ref(db, `rooms/${roomId}/info/sharedControl`)).then(snapshot => {
+    get(ref(db, `rooms/${roomId}/info/isSharedControl`)).then(snapshot => {
         updateAdminControlsVisibility(snapshot.val());
     });
 
     // Listen for changes
-    onValue(ref(db, `rooms/${roomId}/info/sharedControl`), (snapshot) => {
+    onValue(ref(db, `rooms/${roomId}/info/isSharedControl`), (snapshot) => {
         updateAdminControlsVisibility(snapshot.val());
         // Re-render queue to update drag handles based on new permission
         if (typeof renderQueue === 'function' && currentQueueSnapshot) {

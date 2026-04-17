@@ -31,6 +31,7 @@ let mySessionId = null;
 let activeSessions = [];
 let isSharedControl = false; // Default to false until loaded
 let currentSessionRef = null;
+let roomCreatorId = null; // createdBy — original room owner; takes leader priority when online
 
 // Kiosk Mode State
 let isKioskEnabled = false;
@@ -41,6 +42,21 @@ let kioskExitTapTimer = null;
 
 function isAmILeader() {
     if (!mySessionId || activeSessions.length === 0) return false;
+
+    // Creator-priority: if the room's original creator has any active session,
+    // the leader is that session (prefer mine if I'm the creator, otherwise the
+    // creator's earliest session). This ensures the original host reclaims the
+    // crown immediately on reconnect, regardless of session connection order.
+    if (roomCreatorId && currentUser) {
+        const creatorSessions = activeSessions.filter(s => s.uid === roomCreatorId);
+        if (creatorSessions.length > 0) {
+            if (currentUser.uid !== roomCreatorId) return false;
+            const mine = creatorSessions.find(s => s.key === mySessionId);
+            return mine ? mine.key === creatorSessions[0].key : false;
+        }
+        // No creator session online: fall through to earliest-session fallback
+    }
+
     return activeSessions[0].key === mySessionId;
 }
 
@@ -543,7 +559,7 @@ async function setupRoom(id, isReuse) {
     let roomUpdates = {};
 
     if (isReuse) {
-        // Only update hostOnline, preserve other settings like sharedControl
+        // Only update hostOnline, preserve other settings like isSharedControl
         roomUpdates[`rooms/${id}/info/hostOnline`] = true;
         roomUpdates[`rooms/${id}/info/name`] = roomName;
         // Reuse shouldn't change isPrivate unless we explicitly want to, preserving existing
@@ -553,7 +569,7 @@ async function setupRoom(id, isReuse) {
             name: roomName,
             createdAt: serverTimestamp(),
             hostOnline: true,
-            sharedControl: false,
+            isSharedControl: false,
             isPrivate: false,
             createdBy: currentUser.uid,
             creatorName: currentUser.displayName
@@ -589,7 +605,8 @@ async function setupRoom(id, isReuse) {
         mySessionId = currentSessionRef.key; // Store my session ID
         const sessionData = {
             connectedAt: serverTimestamp(),
-            userAgent: navigator.userAgent
+            userAgent: navigator.userAgent,
+            uid: currentUser ? currentUser.uid : null
         };
         await set(currentSessionRef, sessionData);
         onDisconnect(currentSessionRef).remove();
@@ -2826,6 +2843,12 @@ document.getElementById('delete-room-btn').addEventListener('click', async () =>
 // Shared Control Toggle - initialized after room is entered
 function initRoomSettings() {
     if (!roomId) return;
+
+    // --- Room Creator (drives leader election) ---
+    onValue(ref(db, `rooms/${roomId}/info/createdBy`), (snapshot) => {
+        roomCreatorId = snapshot.val() || null;
+        updateLeaderUI();
+    });
 
     // --- Shared Control ---
     onValue(ref(db, `rooms/${roomId}/info/isSharedControl`), (snapshot) => {
